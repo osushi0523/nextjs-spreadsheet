@@ -1,9 +1,6 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo, useState } from "react";
-import {
-  getOrInitSheetData,
-  MOCK_SHEETS,
-} from "../../containers/useSheetLoader";
+import { getOrInitSheetData } from "../../containers/useSheetLoader";
 import {
   activeSheetIdAtom,
   applyColumnBindingAtom,
@@ -11,6 +8,7 @@ import {
   type ColumnId,
   columnConfigsAtom,
   columnNamesAtom,
+  DEFAULT_SHEET_TEMPLATES,
   type PulldownMode,
   referencedSheetsDataAtom,
 } from "../../stores";
@@ -43,15 +41,16 @@ export const useColumnSettingModalContainer = ({
     : undefined;
 
   const candidateSheets: CandidateSheet[] = useMemo(() => {
-    return MOCK_SHEETS.filter((s) => s.id !== activeSheetId).map((s) => ({
-      id: s.id,
-      name: s.name,
-    }));
+    return Object.values(DEFAULT_SHEET_TEMPLATES)
+      .filter((s) => s.id !== activeSheetId)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+      }));
   }, [activeSheetId]);
 
   const defaultSheetId = useMemo(() => {
-    const productMaster = candidateSheets.find((s) => s.id === "sheet-2");
-    return productMaster ? productMaster.id : (candidateSheets[0]?.id ?? "");
+    return candidateSheets[0]?.id ?? "";
   }, [candidateSheets]);
 
   // Initial source sheet ID

@@ -5,5 +5,6 @@ export * from "./derived";
 export * from "./edit";
 export * from "./filter";
 export * from "./summary";
+export * from "./templates";
 export * from "./types";
 export * from "./ui";

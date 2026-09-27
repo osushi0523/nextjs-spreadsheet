@@ -132,10 +132,10 @@ export const cellFamily = atomFamily(
         return get(baseCellValuesAtom)[key] ?? ""; // 未編集なら初期データから取得
       },
       (get, set, newValue: string) => {
-        // Lookup column is read-only
+        // Lookup or readOnly column is read-only
         const configs = get(activeColumnConfigsAtom);
         const colConfig = configs[address.colId];
-        if (colConfig && colConfig.type === "lookup") {
+        if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
           return;
         }
 

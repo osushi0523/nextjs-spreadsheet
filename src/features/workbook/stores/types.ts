@@ -52,9 +52,9 @@ export type LookupBinding = {
 };
 
 export type ColumnConfig =
-  | { type: "default" }
-  | { type: "pulldown"; pulldown: PulldownBinding }
-  | { type: "lookup"; lookup: LookupBinding };
+  | { type: "default"; readOnly?: boolean }
+  | { type: "pulldown"; pulldown: PulldownBinding; readOnly?: boolean }
+  | { type: "lookup"; lookup: LookupBinding; readOnly?: boolean };
 
 export type ColumnFilter = {
   selectedValues: string[];
@@ -67,4 +67,45 @@ export type SheetData = {
   cols: ColumnId[];
   colNames: Record<ColumnId, string>;
   values: Record<string, string>;
+};
+
+// --- Sheet & Column Template Types (雛形スキーマ型定義) ---
+
+export type ColumnTemplateType =
+  | { type: "text" }
+  | { type: "number"; format?: "currency" | "integer" | "decimal" }
+  | {
+      type: "pulldown";
+      mode: "dropdown" | "combobox";
+      sourceTemplateId: string;
+      sourceKeyField: string;
+      lookupFields: {
+        field: string;
+        headerName: string;
+        sourceField: string;
+      }[];
+    }
+  | {
+      type: "lookup";
+      parentField: string;
+      sourceTemplateId: string;
+      sourceField: string;
+    };
+
+export type ColumnTemplate = {
+  field: string;
+  headerName: string;
+  type: ColumnTemplateType;
+  width?: number;
+  hasTotal?: boolean;
+  readOnly?: boolean;
+  align?: "left" | "center" | "right";
+};
+
+export type SheetTemplate = {
+  id: string;
+  name: string;
+  description?: string;
+  columns: ColumnTemplate[];
+  defaultRowCount?: number;
 };

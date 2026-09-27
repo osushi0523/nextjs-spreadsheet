@@ -38,10 +38,11 @@ import {
 } from "../stores";
 import { useExportExcel } from "./useExportExcel";
 import { useExportPdf } from "./useExportPdf";
-import { MOCK_SHEETS, useSheetLoader } from "./useSheetLoader";
+import { useSheetLoader } from "./useSheetLoader";
 
 export const WorkbookContainer: FC = () => {
-  const { activeSheet, activeSheetId, handleSelectSheet } = useSheetLoader();
+  const { activeSheet, activeSheetId, openSheets, handleSelectSheet } =
+    useSheetLoader();
 
   const { exportCurrentSheet, isExporting: isExportingExcel } =
     useExportExcel();
@@ -184,7 +185,7 @@ export const WorkbookContainer: FC = () => {
           tabs={
             <SheetTabs
               activeSheetId={activeSheetId}
-              sheets={MOCK_SHEETS}
+              sheets={openSheets}
               onSelectSheet={handleSelectSheet}
             />
           }

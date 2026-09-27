@@ -56,7 +56,7 @@ const CellInner: FC<InnerProps> = memo(
     const referencedSheets = useAtomValue(referencedSheetsDataAtom);
     const cellEdits = useAtomValue(cellEditsAtom);
 
-    const isLookup = config.type === "lookup";
+    const isLookup = config.type === "lookup" || Boolean(config.readOnly);
     const isPulldown = config.type === "pulldown";
     const pulldownMode = isPulldown ? config.pulldown.mode : undefined;
 

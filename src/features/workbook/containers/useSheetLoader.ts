@@ -1,4 +1,4 @@
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect } from "react";
 import {
   activeSheetIdAtom,
@@ -9,64 +9,16 @@ import {
   type ColumnConfig,
   type ColumnId,
   columnConfigsAtom,
+  columnTotalsAtom,
   createColumnId,
   createRowId,
+  DEFAULT_SHEET_TEMPLATES,
+  INITIAL_OPEN_SHEET_IDS,
+  openSheetsAtom,
   type RowId,
   referencedSheetsDataAtom,
+  type SheetData,
 } from "../stores";
-
-const getColumnLabel = (index: number): string => {
-  let label = "";
-  let n = index + 1;
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    label = String.fromCharCode(65 + rem) + label;
-    n = Math.floor((n - 1) / 26);
-  }
-  return label;
-};
-
-export const MOCK_SHEETS = Array.from({ length: 20 }, (_, i) => {
-  const sheetIndex = i + 1;
-  if (sheetIndex === 1) {
-    return {
-      id: "sheet-1",
-      name: "生産量登録",
-      rowCount: 100000,
-      colCount: 11,
-    };
-  }
-  if (sheetIndex === 2) {
-    return {
-      id: "sheet-2",
-      name: "商品マスター",
-      rowCount: 15,
-      colCount: 4,
-    };
-  }
-  if (sheetIndex === 3) {
-    return {
-      id: "sheet-3",
-      name: "会計単位",
-      rowCount: 11,
-      colCount: 2,
-    };
-  }
-  if (sheetIndex === 4) {
-    return {
-      id: "sheet-4",
-      name: "事業所",
-      rowCount: 47,
-      colCount: 2,
-    };
-  }
-  return {
-    id: `sheet-${sheetIndex}`,
-    name: `シート ${sheetIndex}`,
-    rowCount: 1000 + ((sheetIndex * 450) % 9001),
-    colCount: 10 + ((sheetIndex * 2) % 41),
-  };
-});
 
 const MOCK_TYPES = ["TYPE-A", "TYPE-B", "TYPE-C", "TYPE-D", "TYPE-E", "TYPE-F"];
 
@@ -80,8 +32,6 @@ const MOCK_CATEGORIES = [
 ];
 
 const MOCK_YEARS = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
-
-const MOCK_OFFICES = ["08", "09", "10", "11", "12", "13", "14"];
 
 const MOCK_ACCOUNTING_UNITS = [
   { code: "1000", name: "経営企画部" },
@@ -147,102 +97,33 @@ const MOCK_OFFICES_MASTER = [
   { code: "47", name: "沖縄事業所" },
 ];
 
-const MOCK_PRODUCTS = [
-  {
-    code: "PRD-001",
-    name: "MacBook Pro 14",
-    price: "248,000円",
-    category: "PC",
-  },
-  {
-    code: "PRD-002",
-    name: "Magic Mouse",
-    price: "10,800円",
-    category: "アクセサリ",
-  },
-  {
-    code: "PRD-003",
-    name: "Magic Keyboard",
-    price: "19,800円",
-    category: "アクセサリ",
-  },
-  {
-    code: "PRD-004",
-    name: "Studio Display 27",
-    price: "219,800円",
-    category: "ディスプレイ",
-  },
-  {
-    code: "PRD-005",
-    name: "AirPods Pro",
-    price: "39,800円",
-    category: "オーディオ",
-  },
-  {
-    code: "PRD-006",
-    name: "エルゴノミクスチェア",
-    price: "64,000円",
-    category: "家具",
-  },
-  {
-    code: "PRD-007",
-    name: "電動昇降デスク",
-    price: "52,000円",
-    category: "家具",
-  },
-  {
-    code: "PRD-008",
-    name: "USB-C ハブ 7-in-1",
-    price: "5,400円",
-    category: "周辺機器",
-  },
-  {
-    code: "PRD-009",
-    name: "4K Webカメラ",
-    price: "16,200円",
-    category: "周辺機器",
-  },
-  {
-    code: "PRD-010",
-    name: "卓上LEDデスクライト",
-    price: "7,800円",
-    category: "照明",
-  },
-  {
-    code: "PRD-011",
-    name: "モニターアーム",
-    price: "13,500円",
-    category: "アクセサリ",
-  },
-  {
-    code: "PRD-012",
-    name: "デスクマット レザー",
-    price: "3,200円",
-    category: "文具",
-  },
-  {
-    code: "PRD-013",
-    name: "急速充電器 65W GaN",
-    price: "4,900円",
-    category: "電源",
-  },
-  {
-    code: "PRD-014",
-    name: "外付けSSD 1TB",
-    price: "18,400円",
-    category: "ストレージ",
-  },
-  {
-    code: "PRD-015",
-    name: "Bluetoothスピーカー",
-    price: "12,000円",
-    category: "オーディオ",
-  },
+const MOCK_COST_DEPTS = [
+  { code: "3000", name: "統括製造課", category: "管理" },
+  { code: "3001", name: "第1製造課", category: "製造" },
+  { code: "3002", name: "第2製造課", category: "製造" },
+  { code: "3003", name: "第3製造課", category: "製造" },
+  { code: "3004", name: "精製加工課", category: "製造" },
+  { code: "3005", name: "充填課", category: "製造" },
+  { code: "3006", name: "包装課", category: "製造" },
+  { code: "3007", name: "品質保証課", category: "補助" },
+  { code: "3008", name: "工務課", category: "補助" },
+  { code: "3009", name: "生産管理課", category: "補助" },
+  { code: "3010", name: "資材課", category: "補助" },
 ];
 
 export const sheetColumnConfigsCache: Record<
   string,
   Record<ColumnId, ColumnConfig>
+> = {};
+
+export const sheetColumnTotalsCache: Record<
+  string,
+  Record<ColumnId, boolean>
+> = {};
+
+export const sheetFieldToColIdCache: Record<
+  string,
+  Record<string, ColumnId>
 > = {};
 
 export const sheetDataCache: Record<
@@ -255,49 +136,48 @@ export const sheetDataCache: Record<
   }
 > = {};
 
-export const getOrInitSheetData = (sheetId: string) => {
+export const getOrInitSheetData = (sheetId: string): SheetData | null => {
   if (!sheetDataCache[sheetId]) {
-    const sheet = MOCK_SHEETS.find((s) => s.id === sheetId);
-    if (!sheet) return null;
+    const template = DEFAULT_SHEET_TEMPLATES[sheetId];
+    if (!template) return null;
 
-    const sheetIndex = MOCK_SHEETS.indexOf(sheet);
-    const { rowCount, colCount } = sheet;
+    const rowCount = template.defaultRowCount ?? 100;
+    const columns = template.columns;
 
     const rows = Array.from({ length: rowCount }, () => createRowId());
-    const cols = Array.from({ length: colCount }, () => createColumnId());
+    const cols = Array.from({ length: columns.length }, () => createColumnId());
     const colNames: Record<ColumnId, string> = {};
+    const fieldToColId: Record<string, ColumnId> = {};
+    const defaultConfigs: Record<ColumnId, ColumnConfig> = {};
+    const defaultTotals: Record<ColumnId, boolean> = {};
     const initialValues: Record<string, string> = {};
 
-    if (sheetId === "sheet-1") {
-      // 生産量登録固有の列名とデータ（参照列を含む）
-      const productionColHeaders = [
-        "タイプ",
-        "データ種別",
-        "年度",
-        "会計単位",
-        "会計単位名",
-        "事業所",
-        "事業所名",
-        "原価部門",
-        "原価規格",
-        "生産量",
-        "上がり数量",
-      ];
-      for (let c = 0; c < cols.length; c++) {
-        colNames[cols[c]] = productionColHeaders[c] ?? getColumnLabel(c);
+    for (let c = 0; c < columns.length; c++) {
+      const colDef = columns[c];
+      const colId = cols[c];
+      colNames[colId] = colDef.headerName;
+      fieldToColId[colDef.field] = colId;
+      if (colDef.hasTotal) {
+        defaultTotals[colId] = true;
       }
+    }
+    sheetFieldToColIdCache[sheetId] = fieldToColId;
 
+    if (sheetId === "production-volume") {
       for (let r = 0; r < rows.length; r++) {
         const type = MOCK_TYPES[r % MOCK_TYPES.length];
         const category =
           MOCK_CATEGORIES[(r + Math.floor(r / 6)) % MOCK_CATEGORIES.length];
         const year = MOCK_YEARS[(r * 3) % MOCK_YEARS.length];
-        const accountingUnit = String(1000 + ((r * 2) % 11)); // 1000..1010
+        const unit = MOCK_ACCOUNTING_UNITS[r % MOCK_ACCOUNTING_UNITS.length];
         const office =
-          MOCK_OFFICES[(r + Math.floor(r / 3)) % MOCK_OFFICES.length]; // 08..14
-        const costDept = String(3000 + ((r * 5) % 11)); // 3000..3010
+          MOCK_OFFICES_MASTER[
+            (r + Math.floor(r / 3)) % MOCK_OFFICES_MASTER.length
+          ];
+        const costDept =
+          MOCK_COST_DEPTS[(r + Math.floor(r / 5)) % MOCK_COST_DEPTS.length];
 
-        // 原価規格: 5桁目は1~9、1,2桁目は00~20 (例: 10020, 30010)
+        // 原価規格
         const digit5 = 1 + ((r * 7) % 9);
         const lowerDigits = (r * 11) % 21;
         const costSpec = `${digit5}00${String(lowerDigits).padStart(2, "0")}`;
@@ -309,136 +189,160 @@ export const getOrInitSheetData = (sheetId: string) => {
           Math.min(500000, Math.round(baseVolume / 100) * 100),
         );
 
-        // 上がり数量: 生産量の値より適度に増やす
+        // 上がり数量
         const yieldRatio = 1.05 + (r % 15) * 0.01 + (r % 3) * 0.03;
         const yieldVolume =
           Math.round((productionVolume * yieldRatio) / 10) * 10;
 
-        const rowValues = [
+        const rowFieldValues: Record<string, string> = {
           type,
           category,
           year,
-          accountingUnit,
-          "", // 参照列（会計単位名）: 動的に解決
-          office,
-          "", // 参照列（事業所名）: 動的に解決
-          costDept,
-          costSpec,
-          String(productionVolume),
-          String(yieldVolume),
-        ];
+          accounting_unit_code: unit.code,
+          accounting_unit_name: "", // Lookup
+          office_code: office.code,
+          office_name: "", // Lookup
+          cost_dept_code: costDept.code,
+          cost_dept_name: "", // Lookup
+          cost_spec: costSpec,
+          production_volume: String(productionVolume),
+          yield_volume: String(yieldVolume),
+        };
 
-        for (let c = 0; c < cols.length; c++) {
-          initialValues[`${rows[r]}-${cols[c]}`] = rowValues[c] ?? "";
+        for (let c = 0; c < columns.length; c++) {
+          const colDef = columns[c];
+          initialValues[`${rows[r]}-${cols[c]}`] =
+            rowFieldValues[colDef.field] ?? "";
         }
       }
 
-      // 会計単位と事業所をデフォルトでコンボボックスプルダウンに設定し、参照列（会計単位名、事業所名）を構成
-      const sheet3Data = getOrInitSheetData("sheet-3");
-      const sheet4Data = getOrInitSheetData("sheet-4");
-      const defaultConfigs: Record<ColumnId, ColumnConfig> = {};
+      // Pre-initialize master sheets so we can resolve their key and lookup col IDs
+      const auData = getOrInitSheetData("accounting-unit-master");
+      const officeData = getOrInitSheetData("office-master");
+      const cdData = getOrInitSheetData("cost-department-master");
 
-      if (sheet3Data && sheet3Data.cols.length >= 2) {
-        defaultConfigs[cols[3]] = {
+      const auColMap = sheetFieldToColIdCache["accounting-unit-master"] ?? {};
+      const officeColMap = sheetFieldToColIdCache["office-master"] ?? {};
+      const cdColMap = sheetFieldToColIdCache["cost-department-master"] ?? {};
+
+      // 会計単位 Pulldown & Lookup
+      const auCodeCol = fieldToColId.accounting_unit_code;
+      const auNameCol = fieldToColId.accounting_unit_name;
+      if (auData && auCodeCol && auNameCol && auColMap.code && auColMap.name) {
+        defaultConfigs[auCodeCol] = {
           type: "pulldown",
           pulldown: {
-            sourceSheetId: "sheet-3",
-            sourceKeyColId: sheet3Data.cols[0],
+            sourceSheetId: "accounting-unit-master",
+            sourceKeyColId: auColMap.code,
             lookupColumns: [
               {
-                lookupColId: cols[4],
-                sourceColId: sheet3Data.cols[1],
+                lookupColId: auNameCol,
+                sourceColId: auColMap.name,
                 sourceColName: "会計単位名",
               },
             ],
             mode: "combobox",
           },
         };
-
-        defaultConfigs[cols[4]] = {
+        defaultConfigs[auNameCol] = {
           type: "lookup",
+          readOnly: true,
           lookup: {
-            parentColId: cols[3],
-            sourceSheetId: "sheet-3",
-            sourceColId: sheet3Data.cols[1],
+            parentColId: auCodeCol,
+            sourceSheetId: "accounting-unit-master",
+            sourceColId: auColMap.name,
           },
         };
       }
 
-      if (sheet4Data && sheet4Data.cols.length >= 2) {
-        defaultConfigs[cols[5]] = {
+      // 事業所 Pulldown & Lookup
+      const officeCodeCol = fieldToColId.office_code;
+      const officeNameCol = fieldToColId.office_name;
+      if (
+        officeData &&
+        officeCodeCol &&
+        officeNameCol &&
+        officeColMap.code &&
+        officeColMap.name
+      ) {
+        defaultConfigs[officeCodeCol] = {
           type: "pulldown",
           pulldown: {
-            sourceSheetId: "sheet-4",
-            sourceKeyColId: sheet4Data.cols[0],
+            sourceSheetId: "office-master",
+            sourceKeyColId: officeColMap.code,
             lookupColumns: [
               {
-                lookupColId: cols[6],
-                sourceColId: sheet4Data.cols[1],
+                lookupColId: officeNameCol,
+                sourceColId: officeColMap.name,
                 sourceColName: "事業所名",
               },
             ],
             mode: "combobox",
           },
         };
-
-        defaultConfigs[cols[6]] = {
+        defaultConfigs[officeNameCol] = {
           type: "lookup",
+          readOnly: true,
           lookup: {
-            parentColId: cols[5],
-            sourceSheetId: "sheet-4",
-            sourceColId: sheet4Data.cols[1],
+            parentColId: officeCodeCol,
+            sourceSheetId: "office-master",
+            sourceColId: officeColMap.name,
           },
         };
       }
 
-      sheetColumnConfigsCache["sheet-1"] = defaultConfigs;
-    } else if (sheetId === "sheet-2") {
-      // 商品マスター固有の列名とデータ
-      const productColHeaders = ["商品コード", "商品名", "単価", "カテゴリ"];
-      for (let c = 0; c < cols.length; c++) {
-        colNames[cols[c]] = productColHeaders[c] ?? getColumnLabel(c);
+      // 原価部門 Pulldown & Lookup
+      const cdCodeCol = fieldToColId.cost_dept_code;
+      const cdNameCol = fieldToColId.cost_dept_name;
+      if (cdData && cdCodeCol && cdNameCol && cdColMap.code && cdColMap.name) {
+        defaultConfigs[cdCodeCol] = {
+          type: "pulldown",
+          pulldown: {
+            sourceSheetId: "cost-department-master",
+            sourceKeyColId: cdColMap.code,
+            lookupColumns: [
+              {
+                lookupColId: cdNameCol,
+                sourceColId: cdColMap.name,
+                sourceColName: "原価部門名",
+              },
+            ],
+            mode: "combobox",
+          },
+        };
+        defaultConfigs[cdNameCol] = {
+          type: "lookup",
+          readOnly: true,
+          lookup: {
+            parentColId: cdCodeCol,
+            sourceSheetId: "cost-department-master",
+            sourceColId: cdColMap.name,
+          },
+        };
       }
+    } else if (sheetId === "accounting-unit-master") {
       for (let r = 0; r < rows.length; r++) {
-        const prod = MOCK_PRODUCTS[r % MOCK_PRODUCTS.length];
-        initialValues[`${rows[r]}-${cols[0]}`] = prod.code;
-        initialValues[`${rows[r]}-${cols[1]}`] = prod.name;
-        initialValues[`${rows[r]}-${cols[2]}`] = prod.price;
-        initialValues[`${rows[r]}-${cols[3]}`] = prod.category;
+        const item = MOCK_ACCOUNTING_UNITS[r % MOCK_ACCOUNTING_UNITS.length];
+        initialValues[`${rows[r]}-${cols[0]}`] = item.code;
+        initialValues[`${rows[r]}-${cols[1]}`] = item.name;
       }
-    } else if (sheetId === "sheet-3") {
-      // 会計単位固有の列名とデータ
-      const accountingUnitColHeaders = ["会計単位コード", "会計単位名"];
-      for (let c = 0; c < cols.length; c++) {
-        colNames[cols[c]] = accountingUnitColHeaders[c] ?? getColumnLabel(c);
-      }
+    } else if (sheetId === "office-master") {
       for (let r = 0; r < rows.length; r++) {
-        const unit = MOCK_ACCOUNTING_UNITS[r % MOCK_ACCOUNTING_UNITS.length];
-        initialValues[`${rows[r]}-${cols[0]}`] = unit.code;
-        initialValues[`${rows[r]}-${cols[1]}`] = unit.name;
+        const item = MOCK_OFFICES_MASTER[r % MOCK_OFFICES_MASTER.length];
+        initialValues[`${rows[r]}-${cols[0]}`] = item.code;
+        initialValues[`${rows[r]}-${cols[1]}`] = item.name;
       }
-    } else if (sheetId === "sheet-4") {
-      // 事業所固有の列名とデータ
-      const officeColHeaders = ["事業所コード", "事業所名"];
-      for (let c = 0; c < cols.length; c++) {
-        colNames[cols[c]] = officeColHeaders[c] ?? getColumnLabel(c);
-      }
+    } else if (sheetId === "cost-department-master") {
       for (let r = 0; r < rows.length; r++) {
-        const office = MOCK_OFFICES_MASTER[r % MOCK_OFFICES_MASTER.length];
-        initialValues[`${rows[r]}-${cols[0]}`] = office.code;
-        initialValues[`${rows[r]}-${cols[1]}`] = office.name;
-      }
-    } else {
-      for (let c = 0; c < cols.length; c++) {
-        colNames[cols[c]] = getColumnLabel(c);
-      }
-      for (let r = 0; r < rows.length; r++) {
-        for (let c = 0; c < cols.length; c++) {
-          initialValues[`${rows[r]}-${cols[c]}`] =
-            `${sheetIndex + 1}-${c + 1}:${r + 1}`;
-        }
+        const item = MOCK_COST_DEPTS[r % MOCK_COST_DEPTS.length];
+        initialValues[`${rows[r]}-${cols[0]}`] = item.code;
+        initialValues[`${rows[r]}-${cols[1]}`] = item.name;
+        initialValues[`${rows[r]}-${cols[2]}`] = item.category;
       }
     }
+
+    sheetColumnConfigsCache[sheetId] = defaultConfigs;
+    sheetColumnTotalsCache[sheetId] = defaultTotals;
 
     sheetDataCache[sheetId] = {
       rows,
@@ -448,10 +352,10 @@ export const getOrInitSheetData = (sheetId: string) => {
     };
   }
 
-  const sheet = MOCK_SHEETS.find((s) => s.id === sheetId);
+  const template = DEFAULT_SHEET_TEMPLATES[sheetId];
   return {
     id: sheetId,
-    name: sheet?.name ?? sheetId,
+    name: template?.name ?? sheetId,
     ...sheetDataCache[sheetId],
   };
 };
@@ -463,8 +367,9 @@ export const useSheetLoader = () => {
   const setBaseColumnNames = useSetAtom(baseColumnNamesAtom);
   const setBaseValues = useSetAtom(baseCellValuesAtom);
   const setColumnConfigs = useSetAtom(columnConfigsAtom);
-
+  const setColumnTotals = useSetAtom(columnTotalsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
+  const openSheets = useAtomValue(openSheetsAtom);
 
   const loadSheetData = useCallback(
     (sheetId: string) => {
@@ -478,7 +383,7 @@ export const useSheetLoader = () => {
       setBaseColumnNames(colNames);
       setActiveSheetId(sheetId);
 
-      // Set default column configs if available for this sheet
+      // Set default column configs from template cache
       if (sheetColumnConfigsCache[sheetId]) {
         setColumnConfigs((prev) => ({
           ...prev,
@@ -489,15 +394,27 @@ export const useSheetLoader = () => {
         }));
       }
 
-      // Preload masters into referenced sheets atom as default candidates
-      const masterSheets = ["sheet-2", "sheet-3", "sheet-4"];
-      const referenced: Record<
-        string,
-        NonNullable<ReturnType<typeof getOrInitSheetData>>
-      > = {
+      // Set default column totals from template cache
+      if (sheetColumnTotalsCache[sheetId]) {
+        setColumnTotals((prev) => ({
+          ...prev,
+          [sheetId]: {
+            ...sheetColumnTotalsCache[sheetId],
+            ...(prev[sheetId] ?? {}),
+          },
+        }));
+      }
+
+      // Preload all master sheets into referenced sheets atom
+      const masterSheetIds = [
+        "accounting-unit-master",
+        "office-master",
+        "cost-department-master",
+      ];
+      const referenced: Record<string, SheetData> = {
         [sheetId]: data,
       };
-      for (const mId of masterSheets) {
+      for (const mId of masterSheetIds) {
         const mData = getOrInitSheetData(mId);
         if (mData) {
           referenced[mId] = mData;
@@ -515,13 +432,14 @@ export const useSheetLoader = () => {
       setBaseColumnNames,
       setActiveSheetId,
       setColumnConfigs,
+      setColumnTotals,
       setReferencedSheets,
     ],
   );
 
   useEffect(() => {
     if (!activeSheetId) {
-      loadSheetData(MOCK_SHEETS[0].id);
+      loadSheetData(INITIAL_OPEN_SHEET_IDS[0]);
     }
   }, [activeSheetId, loadSheetData]);
 
@@ -532,11 +450,14 @@ export const useSheetLoader = () => {
     [loadSheetData],
   );
 
-  const activeSheet = MOCK_SHEETS.find((s) => s.id === activeSheetId);
+  const activeSheet = activeSheetId
+    ? DEFAULT_SHEET_TEMPLATES[activeSheetId]
+    : undefined;
 
   return {
     activeSheet,
     activeSheetId,
+    openSheets,
     handleSelectSheet,
   };
 };

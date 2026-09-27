@@ -1,0 +1,150 @@
+import type { SheetTemplate } from "../types";
+
+export const productionVolumeTemplate: SheetTemplate = {
+  id: "production-volume",
+  name: "生産量登録",
+  description: "生産量および上がり数量の実績・計画登録シート",
+  defaultRowCount: 100000,
+  columns: [
+    {
+      field: "type",
+      headerName: "タイプ",
+      type: { type: "text" },
+      width: 120,
+      align: "left",
+    },
+    {
+      field: "category",
+      headerName: "データ種別",
+      type: { type: "text" },
+      width: 140,
+      align: "left",
+    },
+    {
+      field: "year",
+      headerName: "年度",
+      type: { type: "text" },
+      width: 100,
+      align: "center",
+    },
+    {
+      field: "accounting_unit_code",
+      headerName: "会計単位",
+      type: {
+        type: "pulldown",
+        mode: "combobox",
+        sourceTemplateId: "accounting-unit-master",
+        sourceKeyField: "code",
+        lookupFields: [
+          {
+            field: "accounting_unit_name",
+            headerName: "会計単位名",
+            sourceField: "name",
+          },
+        ],
+      },
+      width: 130,
+      align: "left",
+    },
+    {
+      field: "accounting_unit_name",
+      headerName: "会計単位名",
+      type: {
+        type: "lookup",
+        parentField: "accounting_unit_code",
+        sourceTemplateId: "accounting-unit-master",
+        sourceField: "name",
+      },
+      width: 180,
+      readOnly: true,
+      align: "left",
+    },
+    {
+      field: "office_code",
+      headerName: "事業所",
+      type: {
+        type: "pulldown",
+        mode: "combobox",
+        sourceTemplateId: "office-master",
+        sourceKeyField: "code",
+        lookupFields: [
+          {
+            field: "office_name",
+            headerName: "事業所名",
+            sourceField: "name",
+          },
+        ],
+      },
+      width: 120,
+      align: "left",
+    },
+    {
+      field: "office_name",
+      headerName: "事業所名",
+      type: {
+        type: "lookup",
+        parentField: "office_code",
+        sourceTemplateId: "office-master",
+        sourceField: "name",
+      },
+      width: 160,
+      readOnly: true,
+      align: "left",
+    },
+    {
+      field: "cost_dept_code",
+      headerName: "原価部門",
+      type: {
+        type: "pulldown",
+        mode: "combobox",
+        sourceTemplateId: "cost-department-master",
+        sourceKeyField: "code",
+        lookupFields: [
+          {
+            field: "cost_dept_name",
+            headerName: "原価部門名",
+            sourceField: "name",
+          },
+        ],
+      },
+      width: 130,
+      align: "left",
+    },
+    {
+      field: "cost_dept_name",
+      headerName: "原価部門名",
+      type: {
+        type: "lookup",
+        parentField: "cost_dept_code",
+        sourceTemplateId: "cost-department-master",
+        sourceField: "name",
+      },
+      width: 180,
+      readOnly: true,
+      align: "left",
+    },
+    {
+      field: "cost_spec",
+      headerName: "原価規格",
+      type: { type: "text" },
+      width: 130,
+      align: "left",
+    },
+    {
+      field: "production_volume",
+      headerName: "生産量",
+      type: { type: "number", format: "integer" },
+      width: 140,
+      hasTotal: true,
+      align: "right",
+    },
+    {
+      field: "yield_volume",
+      headerName: "上がり数量",
+      type: { type: "number", format: "integer" },
+      width: 140,
+      hasTotal: true,
+      align: "right",
+    },
+  ],
+};
