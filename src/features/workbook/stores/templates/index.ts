@@ -14,7 +14,7 @@ import {
   modifiedRowOrdersAtom,
 } from "../edit";
 import { columnTotalsAtom } from "../summary";
-import type { SheetTemplate } from "../types";
+import type { SheetCategory, SheetTemplate } from "../types";
 import { activeSheetIdAtom } from "../ui";
 import { accountingUnitTemplate } from "./accountingUnit";
 import { costDepartmentTemplate } from "./costDepartment";
@@ -27,6 +27,19 @@ export {
   officeTemplate,
   costDepartmentTemplate,
 };
+
+export const DEFAULT_SHEET_CATEGORIES: SheetCategory[] = [
+  {
+    id: "planning",
+    name: "計画・実績",
+    description: "生産量や各種計画・実績データの管理",
+  },
+  {
+    id: "master",
+    name: "マスタ管理",
+    description: "会計単位、事業所、原価部門などの各種マスタデータ",
+  },
+];
 
 export const DEFAULT_SHEET_TEMPLATES: Record<string, SheetTemplate> = {
   [productionVolumeTemplate.id]: productionVolumeTemplate,
@@ -44,10 +57,49 @@ export const INITIAL_OPEN_SHEET_IDS: string[] = [
 
 // --- 雛形管理 Atom 群（Template State Atoms） ---
 
+// 全カテゴリ
+export const sheetCategoriesAtom = atom<SheetCategory[]>(
+  DEFAULT_SHEET_CATEGORIES,
+);
+
 // 全シート雛形カタログ
 export const sheetTemplatesAtom = atom<Record<string, SheetTemplate>>(
   DEFAULT_SHEET_TEMPLATES,
 );
+
+// 全シート雛形配列
+export const allSheetTemplatesAtom = atom((get) => {
+  const templates = get(sheetTemplatesAtom);
+  return Object.values(templates);
+});
+
+// カテゴリ別シート一覧マップ
+export const sheetsByCategoryAtom = atom((get) => {
+  const templates = get(sheetTemplatesAtom);
+  const categories = get(sheetCategoriesAtom);
+  const result: { category: SheetCategory; sheets: SheetTemplate[] }[] = [];
+
+  for (const cat of categories) {
+    const sheets = Object.values(templates).filter(
+      (t) => t.category === cat.id,
+    );
+    result.push({ category: cat, sheets });
+  }
+
+  // カテゴリ未分類のシートがあれば fallback カテゴリに追加
+  const knownCatIds = new Set(categories.map((c) => c.id));
+  const uncategorizedSheets = Object.values(templates).filter(
+    (t) => !knownCatIds.has(t.category),
+  );
+  if (uncategorizedSheets.length > 0) {
+    result.push({
+      category: { id: "other", name: "その他" },
+      sheets: uncategorizedSheets,
+    });
+  }
+
+  return result;
+});
 
 // 現在開いている（タブに表示されている）シートID配列
 export const openSheetIdsAtom = atom<string[]>(INITIAL_OPEN_SHEET_IDS);

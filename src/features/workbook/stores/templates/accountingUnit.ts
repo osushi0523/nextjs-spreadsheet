@@ -3,6 +3,7 @@ import type { SheetTemplate } from "../types";
 export const accountingUnitTemplate: SheetTemplate = {
   id: "accounting-unit-master",
   name: "会計単位",
+  category: "master",
   description: "会計単位（部署・部門）のマスタシート",
   defaultRowCount: 11,
   columns: [

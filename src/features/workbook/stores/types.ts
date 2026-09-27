@@ -102,9 +102,16 @@ export type ColumnTemplate = {
   align?: "left" | "center" | "right";
 };
 
+export type SheetCategory = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
 export type SheetTemplate = {
   id: string;
   name: string;
+  category: string;
   description?: string;
   columns: ColumnTemplate[];
   defaultRowCount?: number;

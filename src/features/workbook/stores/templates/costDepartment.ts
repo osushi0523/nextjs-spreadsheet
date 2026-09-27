@@ -3,6 +3,7 @@ import type { SheetTemplate } from "../types";
 export const costDepartmentTemplate: SheetTemplate = {
   id: "cost-department-master",
   name: "原価部門マスタ",
+  category: "master",
   description: "原価部門および製造課のマスタシート",
   defaultRowCount: 11,
   columns: [

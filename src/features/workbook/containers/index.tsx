@@ -9,6 +9,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { type FC, useCallback, useMemo, useState } from "react";
 import { CellContainer } from "../Cell/containers";
 import { Workbook } from "../components";
+import { SheetMenuDrawer } from "../components/SheetMenuDrawer";
 import { SheetTabs } from "../components/SheetTabs";
 import { Toolbar } from "../components/Toolbar";
 import { PdfPreview } from "../PdfPreview/components";
@@ -33,6 +34,7 @@ import {
   isColumnId,
   type RowId,
   removeColumnBindingAtom,
+  sheetCategoriesAtom,
   toggleColumnTotalAtom,
   viewModeAtom,
 } from "../stores";
@@ -41,8 +43,18 @@ import { useExportPdf } from "./useExportPdf";
 import { useSheetLoader } from "./useSheetLoader";
 
 export const WorkbookContainer: FC = () => {
-  const { activeSheet, activeSheetId, openSheets, handleSelectSheet } =
-    useSheetLoader();
+  const {
+    activeSheet,
+    activeSheetId,
+    openSheets,
+    openSheetIds,
+    sheetsByCategory,
+    handleSelectSheet,
+    handleOpenSheet,
+    handleCloseSheet,
+  } = useSheetLoader();
+  const categories = useAtomValue(sheetCategoriesAtom);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const { exportCurrentSheet, isExporting: isExportingExcel } =
     useExportExcel();
@@ -178,6 +190,7 @@ export const WorkbookContainer: FC = () => {
               sheetName={activeSheet?.name}
               onExport={exportCurrentSheet}
               onPreviewPdf={previewCurrentSheetPdf}
+              onOpenMenu={() => setIsDrawerOpen(true)}
               isExportingExcel={isExportingExcel}
               isExportingPdf={isExportingPdf}
             />
@@ -187,6 +200,8 @@ export const WorkbookContainer: FC = () => {
               activeSheetId={activeSheetId}
               sheets={openSheets}
               onSelectSheet={handleSelectSheet}
+              onCloseSheet={handleCloseSheet}
+              onOpenMenu={() => setIsDrawerOpen(true)}
             />
           }
           sheet={
@@ -211,6 +226,15 @@ export const WorkbookContainer: FC = () => {
           }
         />
       </DndContext>
+      <SheetMenuDrawer
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
+        categories={categories}
+        sheetsByCategory={sheetsByCategory}
+        openSheetIds={openSheetIds}
+        activeSheetId={activeSheetId}
+        onSelectSheet={handleOpenSheet}
+      />
       {settingModalColId !== null && (
         <ColumnSettingModal
           key={settingModalColId}

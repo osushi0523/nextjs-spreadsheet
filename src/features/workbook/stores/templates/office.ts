@@ -3,6 +3,7 @@ import type { SheetTemplate } from "../types";
 export const officeTemplate: SheetTemplate = {
   id: "office-master",
   name: "事業所",
+  category: "master",
   description: "全国事業所のマスタシート",
   defaultRowCount: 47,
   columns: [

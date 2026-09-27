@@ -1,4 +1,8 @@
-import { DownloadIcon, FileTextIcon } from "@radix-ui/react-icons";
+import {
+  DownloadIcon,
+  FileTextIcon,
+  HamburgerMenuIcon,
+} from "@radix-ui/react-icons";
 import { Button, Flex, Select, TextField } from "@radix-ui/themes";
 import { type FC, useCallback } from "react";
 import { useCurrentLocale } from "@/i18n/context";
@@ -11,6 +15,7 @@ type ToolbarProps = {
   sheetName?: string;
   onExport: () => void | Promise<void>;
   onPreviewPdf: () => void | Promise<void>;
+  onOpenMenu?: () => void;
   isExportingExcel?: boolean;
   isExportingPdf?: boolean;
 };
@@ -19,6 +24,7 @@ export const Toolbar: FC<ToolbarProps> = ({
   sheetName,
   onExport,
   onPreviewPdf,
+  onOpenMenu,
   isExportingExcel,
   isExportingPdf,
 }) => {
@@ -40,6 +46,18 @@ export const Toolbar: FC<ToolbarProps> = ({
 
   return (
     <Flex align="center" gap="2" px="4" py="2" className={styles.toolbar}>
+      {onOpenMenu && (
+        <Button
+          type="button"
+          onClick={onOpenMenu}
+          variant="soft"
+          color="gray"
+          aria-label={t("sheetMenu")}
+        >
+          <HamburgerMenuIcon />
+          {t("sheetMenu")}
+        </Button>
+      )}
       <Button
         type="button"
         onClick={onExport}

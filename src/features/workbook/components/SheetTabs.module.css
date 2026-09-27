@@ -1,5 +1,54 @@
-.sheetTabs {
+.sheetTabsContainer {
+  display: flex;
+  align-items: center;
   background-color: var(--gray-2);
-  padding-left: 12px;
+  border-bottom: 1px solid var(--gray-4);
+  padding-left: 8px;
   padding-right: 12px;
+}
+
+.menuButton {
+  margin-right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sheetTabs {
+  flex: 1;
+  background-color: transparent;
+}
+
+.tabItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabTitle {
+  user-select: none;
+}
+
+.tabCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-1);
+  border: none;
+  background: transparent;
+  color: var(--gray-9);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  margin-right: -4px;
+  transition: all 0.15s ease;
+  opacity: 0.5;
+}
+
+.tabCloseButton:hover {
+  background-color: var(--gray-5);
+  color: var(--gray-12);
+  opacity: 1;
 }

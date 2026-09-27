@@ -6,6 +6,7 @@ export const localMessages = {
     generatingPdf: '"{sheetName}" のPDFを生成中...',
     printPreview: '"{sheetName}" の印刷プレビュー (PDF)',
     defaultSheetName: "シート",
+    sheetMenu: "シート一覧",
   },
   en: {
     exportExcel: "Export to Excel",
@@ -14,5 +15,6 @@ export const localMessages = {
     generatingPdf: 'Generating "{sheetName}" PDF...',
     printPreview: 'Print Preview "{sheetName}" (PDF)',
     defaultSheetName: "Sheet",
+    sheetMenu: "Sheets",
   },
 } as const;

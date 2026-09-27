@@ -9,17 +9,21 @@ import {
   baseRowOrderAtom,
   type ColumnConfig,
   type ColumnId,
+  closeSheetAtom,
   columnConfigsAtom,
   columnTotalsAtom,
   createColumnId,
   createRowId,
   DEFAULT_SHEET_TEMPLATES,
   INITIAL_OPEN_SHEET_IDS,
+  openSheetAtom,
+  openSheetIdsAtom,
   openSheetsAtom,
   referencedSheetsDataAtom,
   type SheetData,
   sheetDataMapAtom,
   sheetFieldToColIdMapAtom,
+  sheetsByCategoryAtom,
 } from "../stores";
 
 /**
@@ -265,11 +269,38 @@ export const useSheetLoader = () => {
     }
   }, [activeSheetId, loadSheetData]);
 
+  const setOpenSheet = useSetAtom(openSheetAtom);
+  const setCloseSheet = useSetAtom(closeSheetAtom);
+  const openSheetIds = useAtomValue(openSheetIdsAtom);
+  const sheetsByCategory = useAtomValue(sheetsByCategoryAtom);
+
   const handleSelectSheet = useCallback(
     (id: string) => {
       loadSheetData(id);
     },
     [loadSheetData],
+  );
+
+  const handleOpenSheet = useCallback(
+    (sheetId: string) => {
+      setOpenSheet(sheetId);
+      loadSheetData(sheetId);
+    },
+    [setOpenSheet, loadSheetData],
+  );
+
+  const handleCloseSheet = useCallback(
+    (sheetId: string) => {
+      const nextOpenIds = openSheetIds.filter((id) => id !== sheetId);
+      if (activeSheetId === sheetId) {
+        const nextActiveId = nextOpenIds[0] ?? null;
+        if (nextActiveId) {
+          loadSheetData(nextActiveId);
+        }
+      }
+      setCloseSheet(sheetId);
+    },
+    [activeSheetId, openSheetIds, loadSheetData, setCloseSheet],
   );
 
   const activeSheet = activeSheetId
@@ -280,7 +311,11 @@ export const useSheetLoader = () => {
     activeSheet,
     activeSheetId,
     openSheets,
+    openSheetIds,
+    sheetsByCategory,
     handleSelectSheet,
+    handleOpenSheet,
+    handleCloseSheet,
     getOrInitSheetData,
   };
 };
