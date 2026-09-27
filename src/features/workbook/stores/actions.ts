@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { columnConfigsAtom } from "./binding";
+import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
 import { columnNamesAtom, columnOrderAtom, rowOrderAtom } from "./derived";
 import { cellEditsAtom, rowStatusesAtom } from "./edit";
 import {
@@ -70,6 +70,7 @@ export const deleteRowAtom = atom(null, (get, set, rowId: RowId) => {
 
 export const pasteRowsAtom = atom(null, (get, set, rowsData: string[][]) => {
   const columnOrder = get(columnOrderAtom);
+  const activeConfigs = get(activeColumnConfigsAtom);
   const currentRowOrder = get(rowOrderAtom);
   const currentEdits = get(cellEditsAtom);
   const currentRowStatuses = get(rowStatusesAtom);
@@ -79,6 +80,10 @@ export const pasteRowsAtom = atom(null, (get, set, rowsData: string[][]) => {
   const insertIndex = selection
     ? Math.max(selection.start.row, selection.end.row) + 1
     : currentRowOrder.length;
+
+  const targetColumns = columnOrder.filter(
+    (colId) => activeConfigs[colId]?.type !== "lookup",
+  );
 
   const newRowIds: RowId[] = [];
   const newCellEdits: Record<string, string> = {};
@@ -91,8 +96,8 @@ export const pasteRowsAtom = atom(null, (get, set, rowsData: string[][]) => {
 
     rowData.forEach((value, index) => {
       const colIndex = startCol + index;
-      if (colIndex < columnOrder.length) {
-        const colId = columnOrder[colIndex];
+      if (colIndex < targetColumns.length) {
+        const colId = targetColumns[colIndex];
         newCellEdits[`${rowId}-${colId}`] = value;
       }
     });
