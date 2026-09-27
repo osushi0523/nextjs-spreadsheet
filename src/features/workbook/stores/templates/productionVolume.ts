@@ -5,7 +5,7 @@ export const productionVolumeTemplate: SheetTemplate = {
   name: "生産量登録",
   category: "planning",
   description: "生産量および上がり数量の実績・計画登録シート",
-  defaultRowCount: 100000,
+  defaultRowCount: 10000,
   columns: [
     {
       field: "type",

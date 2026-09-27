@@ -2,11 +2,14 @@ import ExcelJS from "exceljs";
 import { useStore } from "jotai";
 import { useCallback, useState } from "react";
 import {
+  activeColumnConfigsAtom,
   activeColumnSummaryValuesAtom,
   activeSheetIdAtom,
   baseCellValuesAtom,
   cellEditsAtom,
+  columnNamesAtom,
   columnOrderAtom,
+  getLookupValue,
   hasActiveColumnTotalsAtom,
   rowOrderAtom,
 } from "../stores";
@@ -27,15 +30,43 @@ export const useExportExcel = () => {
       const edits = store.get(cellEditsAtom);
       const hasTotals = store.get(hasActiveColumnTotalsAtom);
       const summaryValues = store.get(activeColumnSummaryValuesAtom);
+      const columnConfigs = store.get(activeColumnConfigsAtom);
+      const columnNames = store.get(columnNamesAtom);
+
+      // 参照列（lookup）を右端に配置
+      const nonLookupCols = colOrder.filter(
+        (colId) => columnConfigs[colId]?.type !== "lookup",
+      );
+      const lookupCols = colOrder.filter(
+        (colId) => columnConfigs[colId]?.type === "lookup",
+      );
+      const exportColOrder = [...nonLookupCols, ...lookupCols];
 
       const data: string[][] = [];
+
+      // ヘッダー行を追加（列名の表示）
+      const headerRow: string[] = exportColOrder.map(
+        (colId, i) => columnNames[colId] || `列 ${i + 1}`,
+      );
+      data.push(headerRow);
 
       // Construct the 2D array of data representing the spreadsheet
       for (const rowId of rowOrder) {
         const rowData: string[] = [];
-        for (const colId of colOrder) {
-          const key = `${rowId}-${colId}`;
-          const value = edits[key] ?? baseValues[key] ?? "";
+        for (const colId of exportColOrder) {
+          const config = columnConfigs[colId];
+          let value = "";
+          if (config && config.type === "lookup") {
+            value = getLookupValue(
+              store.get,
+              { rowId, colId },
+              config.lookup,
+              baseValues,
+            );
+          } else {
+            const key = `${rowId}-${colId}`;
+            value = edits[key] ?? baseValues[key] ?? "";
+          }
           rowData.push(value);
         }
         data.push(rowData);
@@ -43,7 +74,7 @@ export const useExportExcel = () => {
 
       // Append total row if totals are enabled
       if (hasTotals) {
-        const totalRowData: string[] = colOrder.map(
+        const totalRowData: string[] = exportColOrder.map(
           (colId) => summaryValues[colId] ?? "",
         );
         data.push(totalRowData);

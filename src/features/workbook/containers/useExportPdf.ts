@@ -3,18 +3,21 @@ import jsPDF from "jspdf";
 import autoTable, { type Styles } from "jspdf-autotable";
 import { useCallback, useState } from "react";
 import {
+  activeColumnConfigsAtom,
   activeSheetIdAtom,
   baseCellValuesAtom,
   cellEditsAtom,
+  columnNamesAtom,
   columnOrderAtom,
   columnWidthOverridesAtom,
+  getLookupValue,
   pdfPreviewUrlAtom,
   rowOrderAtom,
   viewModeAtom,
 } from "../stores";
 
-const NOTO_SANS_JP_TTF =
-  "https://fonts.gstatic.com/s/notosansjp/v52/-Ky47oW6u_9Zf66M7X66v-og.ttf";
+const NOTO_SANS_JP_REGULAR_TTF = "/fonts/NotoSansJP-Regular.ttf";
+const NOTO_SANS_JP_BOLD_TTF = "/fonts/NotoSansJP-Bold.ttf";
 
 const initialColumnStyles: Record<string, Partial<Styles>> = {};
 
@@ -52,16 +55,32 @@ export const useExportPdf = () => {
     const baseValues = store.get(baseCellValuesAtom);
     const edits = store.get(cellEditsAtom);
     const columnWidthOverrides = store.get(columnWidthOverridesAtom);
+    const columnConfigs = store.get(activeColumnConfigsAtom);
+    const columnNames = store.get(columnNamesAtom);
 
-    const orientation = colOrder.length > 8 ? "l" : "p";
+    // 参照列（lookup）を右端に配置
+    const nonLookupCols = colOrder.filter(
+      (colId) => columnConfigs[colId]?.type !== "lookup",
+    );
+    const lookupCols = colOrder.filter(
+      (colId) => columnConfigs[colId]?.type === "lookup",
+    );
+    const exportColOrder = [...nonLookupCols, ...lookupCols];
+
+    const orientation = exportColOrder.length > 8 ? "l" : "p";
     const doc = new jsPDF({ orientation, unit: "mm", format: "a4" });
 
     let fontName = "helvetica";
     try {
-      const fontBase64 = await fetchFontAsBase64(NOTO_SANS_JP_TTF);
-      doc.addFileToVFS("NotoSansJP-Regular.ttf", fontBase64);
+      const [regularBase64, boldBase64] = await Promise.all([
+        fetchFontAsBase64(NOTO_SANS_JP_REGULAR_TTF),
+        fetchFontAsBase64(NOTO_SANS_JP_BOLD_TTF),
+      ]);
+      doc.addFileToVFS("NotoSansJP-Regular.ttf", regularBase64);
       doc.addFont("NotoSansJP-Regular.ttf", "NotoSansJP", "normal");
-      doc.setFont("NotoSansJP");
+      doc.addFileToVFS("NotoSansJP-Bold.ttf", boldBase64);
+      doc.addFont("NotoSansJP-Bold.ttf", "NotoSansJP", "bold");
+      doc.setFont("NotoSansJP", "normal");
       fontName = "NotoSansJP";
     } catch (fontError) {
       console.warn("Font loading failed, falling back to helvetica", fontError);
@@ -70,18 +89,33 @@ export const useExportPdf = () => {
     const body: string[][] = [];
     for (const rowId of rowOrder) {
       const rowData: string[] = [];
-      for (const colId of colOrder) {
-        const key = `${rowId}-${colId}`;
-        const value = edits[key] ?? baseValues[key] ?? "";
+      for (const colId of exportColOrder) {
+        const config = columnConfigs[colId];
+        let value = "";
+        if (config && config.type === "lookup") {
+          value = getLookupValue(
+            store.get,
+            { rowId, colId },
+            config.lookup,
+            baseValues,
+          );
+        } else {
+          const key = `${rowId}-${colId}`;
+          value = edits[key] ?? baseValues[key] ?? "";
+        }
         rowData.push(value);
       }
       body.push(rowData);
     }
 
-    const head = [colOrder.map((_, i) => (i + 1).toString())];
+    const head = [
+      exportColOrder.map(
+        (colId, i) => columnNames[colId] || (i + 1).toString(),
+      ),
+    ];
     const dynamicFontSize = Math.max(
       6,
-      Math.min(9, 12 - colOrder.length * 0.2),
+      Math.min(9, 12 - exportColOrder.length * 0.2),
     );
 
     autoTable(doc, {
@@ -103,7 +137,7 @@ export const useExportPdf = () => {
         fontStyle: "bold",
         lineWidth: 0.2,
       },
-      columnStyles: colOrder.reduce((acc, colId, index) => {
+      columnStyles: exportColOrder.reduce((acc, colId, index) => {
         if (columnWidthOverrides[colId]) {
           acc[index] = { cellWidth: "auto", minCellWidth: 10 };
         }
