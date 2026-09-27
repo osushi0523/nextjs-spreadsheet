@@ -1,6 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getOrInitSheetData } from "../../containers/useSheetLoader";
 import {
   activeColumnConfigFamily,
   activeColumnFilterFamily,
@@ -44,8 +43,7 @@ export const useColumnFilterModalContainer = ({
   const options: FilterOption[] = useMemo(() => {
     if (config?.type === "pulldown") {
       const { sourceSheetId, sourceKeyColId, lookupColumns } = config.pulldown;
-      const masterSheet =
-        referencedSheets[sourceSheetId] ?? getOrInitSheetData(sourceSheetId);
+      const masterSheet = referencedSheets[sourceSheetId];
       const labelMap = new Map<string, string>();
 
       if (masterSheet) {

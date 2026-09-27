@@ -1,6 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo, useState } from "react";
-import { getOrInitSheetData } from "../../containers/useSheetLoader";
 import {
   activeSheetIdAtom,
   applyColumnBindingAtom,
@@ -33,6 +32,7 @@ export const useColumnSettingModalContainer = ({
   const activeSheetId = useAtomValue(activeSheetIdAtom);
   const columnNames = useAtomValue(columnNamesAtom);
   const columnConfigs = useAtomValue(columnConfigsAtom);
+  const referencedSheets = useAtomValue(referencedSheetsDataAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
   const applyBinding = useSetAtom(applyColumnBindingAtom);
 
@@ -66,12 +66,12 @@ export const useColumnSettingModalContainer = ({
 
   const sourceSheetData = useMemo(() => {
     if (!sourceSheetId) return null;
-    return getOrInitSheetData(sourceSheetId);
-  }, [sourceSheetId]);
+    return referencedSheets[sourceSheetId] ?? null;
+  }, [sourceSheetId, referencedSheets]);
 
   const candidateColumns: CandidateColumn[] = useMemo(() => {
     if (!sourceSheetData) return [];
-    return sourceSheetData.cols.map((colId, index) => ({
+    return sourceSheetData.cols.map((colId: ColumnId, index: number) => ({
       id: colId,
       name: sourceSheetData.colNames[colId] ?? `列 ${index + 1}`,
     }));
@@ -82,7 +82,7 @@ export const useColumnSettingModalContainer = ({
     if (existingConfig && existingConfig.type === "pulldown") {
       return existingConfig.pulldown.sourceKeyColId;
     }
-    const initialSheet = getOrInitSheetData(initialSourceSheetId);
+    const initialSheet = referencedSheets[initialSourceSheetId];
     const firstCol = initialSheet?.cols[0];
     return firstCol ?? "";
   });
@@ -110,7 +110,7 @@ export const useColumnSettingModalContainer = ({
       return lookups;
     }
 
-    const initialSheet = getOrInitSheetData(initialSourceSheetId);
+    const initialSheet = referencedSheets[initialSourceSheetId];
     const initialLookups: Record<
       ColumnId,
       { selected: boolean; headerName: string }
@@ -138,39 +138,42 @@ export const useColumnSettingModalContainer = ({
   });
 
   // When sourceSheetId changes via user selection in the dropdown
-  const handleSheetChange = useCallback((newSheetId: string) => {
-    setSourceSheetId(newSheetId);
-    const sheetData = getOrInitSheetData(newSheetId);
-    if (!sheetData) {
-      setSourceKeyColId("");
-      setSelectedLookupCols({});
-      return;
-    }
-    const cols = sheetData.cols;
-    if (cols.length > 0) {
-      const firstCol = cols[0];
-      if (firstCol) {
-        setSourceKeyColId(firstCol);
+  const handleSheetChange = useCallback(
+    (newSheetId: string) => {
+      setSourceSheetId(newSheetId);
+      const sheetData = referencedSheets[newSheetId];
+      if (!sheetData) {
+        setSourceKeyColId("");
+        setSelectedLookupCols({});
+        return;
       }
-      const newLookups: Record<
-        ColumnId,
-        { selected: boolean; headerName: string }
-      > = {};
-      for (let i = 1; i < cols.length; i++) {
-        const colId = cols[i];
-        if (colId) {
-          newLookups[colId] = {
-            selected: true,
-            headerName: sheetData.colNames[colId] ?? `列 ${i + 1}`,
-          };
+      const cols = sheetData.cols;
+      if (cols.length > 0) {
+        const firstCol = cols[0];
+        if (firstCol) {
+          setSourceKeyColId(firstCol);
         }
+        const newLookups: Record<
+          ColumnId,
+          { selected: boolean; headerName: string }
+        > = {};
+        for (let i = 1; i < cols.length; i++) {
+          const colId = cols[i];
+          if (colId) {
+            newLookups[colId] = {
+              selected: true,
+              headerName: sheetData.colNames[colId] ?? `列 ${i + 1}`,
+            };
+          }
+        }
+        setSelectedLookupCols(newLookups);
+      } else {
+        setSourceKeyColId("");
+        setSelectedLookupCols({});
       }
-      setSelectedLookupCols(newLookups);
-    } else {
-      setSourceKeyColId("");
-      setSelectedLookupCols({});
-    }
-  }, []);
+    },
+    [referencedSheets],
+  );
 
   const handleKeyColChange = useCallback((newKeyColId: ColumnId) => {
     setSourceKeyColId(newKeyColId);

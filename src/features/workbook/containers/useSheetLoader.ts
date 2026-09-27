@@ -16,173 +16,153 @@ import {
   DEFAULT_SHEET_TEMPLATES,
   INITIAL_OPEN_SHEET_IDS,
   openSheetsAtom,
-  type RowId,
   referencedSheetsDataAtom,
   type SheetData,
+  sheetDataMapAtom,
+  sheetFieldToColIdMapAtom,
 } from "../stores";
 
-export const sheetColumnConfigsCache: Record<
-  string,
-  Record<ColumnId, ColumnConfig>
-> = {};
-
-export const sheetColumnTotalsCache: Record<
-  string,
-  Record<ColumnId, boolean>
-> = {};
-
-export const sheetFieldToColIdCache: Record<
-  string,
-  Record<string, ColumnId>
-> = {};
-
-export const sheetDataCache: Record<
-  string,
-  {
-    rows: RowId[];
-    cols: ColumnId[];
-    colNames: Record<ColumnId, string>;
-    values: Record<string, string>;
-  }
-> = {};
-
 /**
- * 雛形（Template）と生データ（Raw Records）からスプレッドシート用データを自動構築する汎用関数
+ * 雛形（Template）と生データ（Raw Records）からスプレッドシート用データを生成する純粋ヘルパー関数
  */
-export const getOrInitSheetData = (sheetId: string): SheetData | null => {
-  if (!sheetDataCache[sheetId]) {
-    const template = DEFAULT_SHEET_TEMPLATES[sheetId];
-    if (!template) return null;
+export const buildSheetData = (
+  sheetId: string,
+  getFieldToColMap: (
+    templateId: string,
+  ) => Record<string, ColumnId> | undefined,
+): {
+  data: SheetData;
+  fieldToColId: Record<string, ColumnId>;
+  configs: Record<ColumnId, ColumnConfig>;
+  totals: Record<ColumnId, boolean>;
+} | null => {
+  const template = DEFAULT_SHEET_TEMPLATES[sheetId];
+  if (!template) return null;
 
-    const columns = template.columns;
-    const rawRecords = fetchMockSheetRecords(
-      sheetId,
-      template.defaultRowCount ?? 100,
-    );
+  const columns = template.columns;
+  const rawRecords = fetchMockSheetRecords(
+    sheetId,
+    template.defaultRowCount ?? 100,
+  );
 
-    const rows = Array.from({ length: rawRecords.length }, () => createRowId());
-    const cols = Array.from({ length: columns.length }, () => createColumnId());
-    const colNames: Record<ColumnId, string> = {};
-    const fieldToColId: Record<string, ColumnId> = {};
-    const defaultConfigs: Record<ColumnId, ColumnConfig> = {};
-    const defaultTotals: Record<ColumnId, boolean> = {};
-    const initialValues: Record<string, string> = {};
+  const rows = Array.from({ length: rawRecords.length }, () => createRowId());
+  const cols = Array.from({ length: columns.length }, () => createColumnId());
+  const colNames: Record<ColumnId, string> = {};
+  const fieldToColId: Record<string, ColumnId> = {};
+  const configs: Record<ColumnId, ColumnConfig> = {};
+  const totals: Record<ColumnId, boolean> = {};
+  const initialValues: Record<string, string> = {};
 
-    // 1. 列情報の初期化
+  // 1. 列情報の初期化
+  for (let c = 0; c < columns.length; c++) {
+    const colDef = columns[c];
+    const colId = cols[c];
+    if (!colDef || !colId) continue;
+
+    colNames[colId] = colDef.headerName;
+    fieldToColId[colDef.field] = colId;
+
+    if (colDef.hasTotal) {
+      totals[colId] = true;
+    }
+    if (colDef.readOnly && colDef.type.type !== "lookup") {
+      configs[colId] = { type: "default", readOnly: true };
+    }
+  }
+
+  // 2. セル値のマッピング
+  for (let r = 0; r < rows.length; r++) {
+    const record = rawRecords[r] ?? {};
+    const rowId = rows[r];
+    if (!rowId) continue;
+
     for (let c = 0; c < columns.length; c++) {
       const colDef = columns[c];
       const colId = cols[c];
       if (!colDef || !colId) continue;
 
-      colNames[colId] = colDef.headerName;
-      fieldToColId[colDef.field] = colId;
+      initialValues[`${rowId}-${colId}`] = record[colDef.field] ?? "";
+    }
+  }
 
-      if (colDef.hasTotal) {
-        defaultTotals[colId] = true;
+  // 3. プルダウンおよび参照列（Lookup）の自動バインド解決
+  for (const colDef of columns) {
+    const colId = fieldToColId[colDef.field];
+    if (!colId) continue;
+
+    if (colDef.type.type === "pulldown") {
+      const { sourceTemplateId, sourceKeyField, lookupFields, mode } =
+        colDef.type;
+      const sourceColMap = getFieldToColMap(sourceTemplateId) ?? {};
+      const sourceKeyColId = sourceColMap[sourceKeyField];
+
+      if (sourceKeyColId) {
+        const resolvedLookups = lookupFields
+          .map((lf) => ({
+            lookupColId: fieldToColId[lf.field],
+            sourceColId: sourceColMap[lf.sourceField],
+            sourceColName: lf.headerName,
+          }))
+          .filter(
+            (
+              l,
+            ): l is {
+              lookupColId: ColumnId;
+              sourceColId: ColumnId;
+              sourceColName: string;
+            } => Boolean(l.lookupColId && l.sourceColId),
+          );
+
+        configs[colId] = {
+          type: "pulldown",
+          readOnly: colDef.readOnly,
+          pulldown: {
+            sourceSheetId: sourceTemplateId,
+            sourceKeyColId,
+            lookupColumns: resolvedLookups,
+            mode,
+          },
+        };
       }
-      if (colDef.readOnly && colDef.type.type !== "lookup") {
-        defaultConfigs[colId] = { type: "default", readOnly: true };
+    } else if (colDef.type.type === "lookup") {
+      const { parentField, sourceTemplateId, sourceField } = colDef.type;
+      const sourceColMap = getFieldToColMap(sourceTemplateId) ?? {};
+      const parentColId = fieldToColId[parentField];
+      const sourceColId = sourceColMap[sourceField];
+
+      if (parentColId && sourceColId) {
+        configs[colId] = {
+          type: "lookup",
+          readOnly: true,
+          lookup: {
+            parentColId,
+            sourceSheetId: sourceTemplateId,
+            sourceColId,
+          },
+        };
       }
     }
-    sheetFieldToColIdCache[sheetId] = fieldToColId;
+  }
 
-    // 2. セル値のマッピング（生レコード -> cellValues）
-    for (let r = 0; r < rows.length; r++) {
-      const record = rawRecords[r] ?? {};
-      const rowId = rows[r];
-      if (!rowId) continue;
-
-      for (let c = 0; c < columns.length; c++) {
-        const colDef = columns[c];
-        const colId = cols[c];
-        if (!colDef || !colId) continue;
-
-        initialValues[`${rowId}-${colId}`] = record[colDef.field] ?? "";
-      }
-    }
-
-    // 3. プルダウンおよび参照列（Lookup）の自動バインド解決
-    for (const colDef of columns) {
-      const colId = fieldToColId[colDef.field];
-      if (!colId) continue;
-
-      if (colDef.type.type === "pulldown") {
-        const { sourceTemplateId, sourceKeyField, lookupFields, mode } =
-          colDef.type;
-        const sourceSheetData = getOrInitSheetData(sourceTemplateId);
-        const sourceColMap = sheetFieldToColIdCache[sourceTemplateId] ?? {};
-        const sourceKeyColId = sourceColMap[sourceKeyField];
-
-        if (sourceSheetData && sourceKeyColId) {
-          const resolvedLookups = lookupFields
-            .map((lf) => ({
-              lookupColId: fieldToColId[lf.field],
-              sourceColId: sourceColMap[lf.sourceField],
-              sourceColName: lf.headerName,
-            }))
-            .filter(
-              (
-                l,
-              ): l is {
-                lookupColId: ColumnId;
-                sourceColId: ColumnId;
-                sourceColName: string;
-              } => Boolean(l.lookupColId && l.sourceColId),
-            );
-
-          defaultConfigs[colId] = {
-            type: "pulldown",
-            readOnly: colDef.readOnly,
-            pulldown: {
-              sourceSheetId: sourceTemplateId,
-              sourceKeyColId,
-              lookupColumns: resolvedLookups,
-              mode,
-            },
-          };
-        }
-      } else if (colDef.type.type === "lookup") {
-        const { parentField, sourceTemplateId, sourceField } = colDef.type;
-        const sourceSheetData = getOrInitSheetData(sourceTemplateId);
-        const sourceColMap = sheetFieldToColIdCache[sourceTemplateId] ?? {};
-        const parentColId = fieldToColId[parentField];
-        const sourceColId = sourceColMap[sourceField];
-
-        if (sourceSheetData && parentColId && sourceColId) {
-          defaultConfigs[colId] = {
-            type: "lookup",
-            readOnly: true,
-            lookup: {
-              parentColId,
-              sourceSheetId: sourceTemplateId,
-              sourceColId,
-            },
-          };
-        }
-      }
-    }
-
-    sheetColumnConfigsCache[sheetId] = defaultConfigs;
-    sheetColumnTotalsCache[sheetId] = defaultTotals;
-
-    sheetDataCache[sheetId] = {
+  return {
+    data: {
+      id: sheetId,
+      name: template.name,
       rows,
       cols,
       colNames,
       values: initialValues,
-    };
-  }
-
-  const template = DEFAULT_SHEET_TEMPLATES[sheetId];
-  return {
-    id: sheetId,
-    name: template?.name ?? sheetId,
-    ...sheetDataCache[sheetId],
+    },
+    fieldToColId,
+    configs,
+    totals,
   };
 };
 
 export const useSheetLoader = () => {
   const [activeSheetId, setActiveSheetId] = useAtom(activeSheetIdAtom);
+  const [sheetDataMap, setSheetDataMap] = useAtom(sheetDataMapAtom);
+  const [fieldToColMap, setFieldToColMap] = useAtom(sheetFieldToColIdMapAtom);
   const setBaseRowOrder = useSetAtom(baseRowOrderAtom);
   const setBaseColumnOrder = useSetAtom(baseColumnOrderAtom);
   const setBaseColumnNames = useSetAtom(baseColumnNamesAtom);
@@ -191,6 +171,71 @@ export const useSheetLoader = () => {
   const setColumnTotals = useSetAtom(columnTotalsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
   const openSheets = useAtomValue(openSheetsAtom);
+
+  const getOrInitSheetData = useCallback(
+    (sheetId: string): SheetData | null => {
+      // 1. すでに Jotai Atom にデータが存在する場合はそれを返す
+      if (sheetDataMap[sheetId]) {
+        return sheetDataMap[sheetId];
+      }
+
+      // 2. マスタ依存解決用の内部ヘルパー
+      const currentFieldMap = { ...fieldToColMap };
+      const currentDataMap = { ...sheetDataMap };
+      const newConfigs: Record<string, Record<ColumnId, ColumnConfig>> = {};
+      const newTotals: Record<string, Record<ColumnId, boolean>> = {};
+
+      const resolveSheet = (targetId: string): SheetData | null => {
+        if (currentDataMap[targetId]) {
+          return currentDataMap[targetId];
+        }
+
+        const template = DEFAULT_SHEET_TEMPLATES[targetId];
+        if (!template) return null;
+
+        // 依存先マスタを先に再帰解決
+        for (const col of template.columns) {
+          if (col.type.type === "pulldown" || col.type.type === "lookup") {
+            const depId = col.type.sourceTemplateId;
+            if (!currentDataMap[depId]) {
+              resolveSheet(depId);
+            }
+          }
+        }
+
+        const built = buildSheetData(targetId, (id) => currentFieldMap[id]);
+        if (!built) return null;
+
+        currentDataMap[targetId] = built.data;
+        currentFieldMap[targetId] = built.fieldToColId;
+        newConfigs[targetId] = built.configs;
+        newTotals[targetId] = built.totals;
+
+        return built.data;
+      };
+
+      const result = resolveSheet(sheetId);
+      if (!result) return null;
+
+      // 3. Jotai Atoms を一括更新（GC管理可能なステートに保存）
+      setSheetDataMap((prev) => ({ ...prev, ...currentDataMap }));
+      setFieldToColMap((prev) => ({ ...prev, ...currentFieldMap }));
+      setColumnConfigs((prev) => ({ ...prev, ...newConfigs }));
+      setColumnTotals((prev) => ({ ...prev, ...newTotals }));
+      setReferencedSheets((prev) => ({ ...prev, ...currentDataMap }));
+
+      return result;
+    },
+    [
+      sheetDataMap,
+      fieldToColMap,
+      setSheetDataMap,
+      setFieldToColMap,
+      setColumnConfigs,
+      setColumnTotals,
+      setReferencedSheets,
+    ],
+  );
 
   const loadSheetData = useCallback(
     (sheetId: string) => {
@@ -203,61 +248,14 @@ export const useSheetLoader = () => {
       setBaseColumnOrder(cols);
       setBaseColumnNames(colNames);
       setActiveSheetId(sheetId);
-
-      // Set default column configs from template cache
-      if (sheetColumnConfigsCache[sheetId]) {
-        setColumnConfigs((prev) => ({
-          ...prev,
-          [sheetId]: {
-            ...sheetColumnConfigsCache[sheetId],
-            ...(prev[sheetId] ?? {}),
-          },
-        }));
-      }
-
-      // Set default column totals from template cache
-      if (sheetColumnTotalsCache[sheetId]) {
-        setColumnTotals((prev) => ({
-          ...prev,
-          [sheetId]: {
-            ...sheetColumnTotalsCache[sheetId],
-            ...(prev[sheetId] ?? {}),
-          },
-        }));
-      }
-
-      // Preload all referenced master sheets
-      const template = DEFAULT_SHEET_TEMPLATES[sheetId];
-      const referenced: Record<string, SheetData> = {
-        [sheetId]: data,
-      };
-
-      if (template) {
-        for (const col of template.columns) {
-          if (col.type.type === "pulldown" || col.type.type === "lookup") {
-            const masterId = col.type.sourceTemplateId;
-            const masterData = getOrInitSheetData(masterId);
-            if (masterData) {
-              referenced[masterId] = masterData;
-            }
-          }
-        }
-      }
-
-      setReferencedSheets((prev) => ({
-        ...prev,
-        ...referenced,
-      }));
     },
     [
+      getOrInitSheetData,
       setBaseValues,
       setBaseRowOrder,
       setBaseColumnOrder,
       setBaseColumnNames,
       setActiveSheetId,
-      setColumnConfigs,
-      setColumnTotals,
-      setReferencedSheets,
     ],
   );
 
@@ -283,5 +281,6 @@ export const useSheetLoader = () => {
     activeSheetId,
     openSheets,
     handleSelectSheet,
+    getOrInitSheetData,
   };
 };
