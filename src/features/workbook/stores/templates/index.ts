@@ -20,12 +20,14 @@ import { accountingUnitTemplate } from "./accountingUnit";
 import { costDepartmentTemplate } from "./costDepartment";
 import { officeTemplate } from "./office";
 import { productionVolumeTemplate } from "./productionVolume";
+import { productMasterTemplate } from "./productMaster";
 
 export {
   productionVolumeTemplate,
   accountingUnitTemplate,
   officeTemplate,
   costDepartmentTemplate,
+  productMasterTemplate,
 };
 
 export const DEFAULT_SHEET_CATEGORIES: SheetCategory[] = [
@@ -43,6 +45,7 @@ export const DEFAULT_SHEET_CATEGORIES: SheetCategory[] = [
 
 export const DEFAULT_SHEET_TEMPLATES: Record<string, SheetTemplate> = {
   [productionVolumeTemplate.id]: productionVolumeTemplate,
+  [productMasterTemplate.id]: productMasterTemplate,
   [accountingUnitTemplate.id]: accountingUnitTemplate,
   [officeTemplate.id]: officeTemplate,
   [costDepartmentTemplate.id]: costDepartmentTemplate,
@@ -50,6 +53,7 @@ export const DEFAULT_SHEET_TEMPLATES: Record<string, SheetTemplate> = {
 
 export const INITIAL_OPEN_SHEET_IDS: string[] = [
   productionVolumeTemplate.id,
+  productMasterTemplate.id,
   accountingUnitTemplate.id,
   officeTemplate.id,
   costDepartmentTemplate.id,

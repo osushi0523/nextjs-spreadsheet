@@ -7,6 +7,9 @@ export const baseRowOrderAtom = atom<RowId[]>([]);
 export const baseColumnOrderAtom = atom<ColumnId[]>([]);
 export const baseColumnNamesAtom = atom<Record<ColumnId, string>>({});
 
+// DBレコードのversionを保持
+export const rowVersionsAtom = atom<Record<RowId, number>>({});
+
 // --- Multi-Sheet Data Store (Managed via Jotai for reactive GC & Lifecycle) ---
 export const sheetDataMapAtom = atom<Record<string, SheetData>>({});
 export const sheetFieldToColIdMapAtom = atom<

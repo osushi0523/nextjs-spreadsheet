@@ -1,3 +1,7 @@
+import {
+  toProductSheet,
+  type ProductRow,
+} from "../adapters/productSheetAdapter";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect } from "react";
 import { fetchMockSheetRecords } from "../mock";
@@ -7,6 +11,8 @@ import {
   baseColumnNamesAtom,
   baseColumnOrderAtom,
   baseRowOrderAtom,
+  RowIdSchema,
+  rowVersionsAtom,
   type ColumnConfig,
   type ColumnId,
   closeSheetAtom,
@@ -172,6 +178,7 @@ export const useSheetLoader = () => {
   const setBaseColumnNames = useSetAtom(baseColumnNamesAtom);
   const setBaseValues = useSetAtom(baseCellValuesAtom);
   const setColumnConfigs = useSetAtom(columnConfigsAtom);
+  const setRowVersions = useSetAtom(rowVersionsAtom);
   const setColumnTotals = useSetAtom(columnTotalsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
   const openSheets = useAtomValue(openSheetsAtom);
@@ -242,8 +249,31 @@ export const useSheetLoader = () => {
   );
 
   const loadSheetData = useCallback(
-    (sheetId: string) => {
-      const data = getOrInitSheetData(sheetId);
+    async (sheetId: string) => {
+      let data;
+
+      if (sheetId === "product-master") {
+        const response = await fetch("/api/backend/api/spreadsheet/rows", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("商品マスターの取得に失敗しました");
+        }
+
+        const rows: ProductRow[] = await response.json();
+
+        const versions = Object.fromEntries(
+          rows.map((row) => [RowIdSchema.parse(row.id), row.version]),
+        );
+
+        setRowVersions(versions);
+
+        data = toProductSheet(rows);
+      } else {
+        data = getOrInitSheetData(sheetId);
+      }
+
       if (!data) return;
 
       const { rows, cols, colNames, values } = data;
