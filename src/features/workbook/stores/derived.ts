@@ -8,13 +8,14 @@ import {
 } from "./base";
 import { activeColumnConfigsAtom, getLookupValue } from "./binding";
 import {
+  cellCustomStatusesAtom,
   cellEditsAtom,
   modifiedColumnNamesAtom,
   modifiedColumnOrdersAtom,
   modifiedRowOrdersAtom,
   rowStatusesAtom,
 } from "./edit";
-import type { CellAddress, ColumnId, RowId } from "./types";
+import type { CellAddress, CellStatusInfo, ColumnId, RowId } from "./types";
 import { activeCellAtom, activeSheetIdAtom } from "./ui";
 
 export const isCellEditingFamily = atomFamily(
@@ -154,6 +155,54 @@ export const cellFamily = atomFamily(
           set(rowStatusesAtom, {
             ...rowStatuses,
             [address.rowId]: "edited",
+          });
+        }
+      },
+    );
+  },
+  (a, b) => a.rowId === b.rowId && a.colId === b.colId,
+);
+
+export const cellStatusFamily = atomFamily(
+  (address: CellAddress) => {
+    const key = `${address.rowId}-${address.colId}` as const;
+
+    return atom(
+      (get): CellStatusInfo => {
+        // 1. バリデーションエラーや明示的なカスタムステータスを優先
+        const customStatuses = get(cellCustomStatusesAtom);
+        if (customStatuses[key] && customStatuses[key].status !== "none") {
+          return customStatuses[key];
+        }
+
+        // 2. Lookup 列は読み取り専用のため変更なし扱い
+        const configs = get(activeColumnConfigsAtom);
+        const colConfig = configs[address.colId];
+        if (colConfig && colConfig.type === "lookup") {
+          return { status: "none" };
+        }
+
+        // 3. セルの値が初期値から変更されているか判定
+        const edits = get(cellEditsAtom);
+        if (key in edits) {
+          const baseValue = get(baseCellValuesAtom)[key] ?? "";
+          if (edits[key] !== baseValue) {
+            return { status: "edited" };
+          }
+        }
+
+        return { status: "none" };
+      },
+      (get, set, nextStatus: CellStatusInfo) => {
+        const customStatuses = get(cellCustomStatusesAtom);
+        if (nextStatus.status === "none" && !nextStatus.message) {
+          const updated = { ...customStatuses };
+          delete updated[key];
+          set(cellCustomStatusesAtom, updated);
+        } else {
+          set(cellCustomStatusesAtom, {
+            ...customStatuses,
+            [key]: nextStatus,
           });
         }
       },

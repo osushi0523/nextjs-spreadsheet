@@ -54,6 +54,14 @@
   cursor: default;
 }
 
+.cell--edited {
+  background-color: var(--amber-3);
+}
+
+.cell--error {
+  background-color: var(--red-3);
+}
+
 .cell--pulldown {
   cursor: pointer;
 }

@@ -7,7 +7,7 @@ import type {
   KeyboardEvent,
   MouseEvent,
 } from "react";
-import type { PulldownMode } from "../../stores";
+import type { CellStatus, PulldownMode } from "../../stores";
 import styles from "./index.module.css";
 import { PulldownEditor } from "./PulldownEditor";
 
@@ -18,6 +18,7 @@ type Option = {
 
 type Props = {
   value: string;
+  status?: CellStatus;
   isEditing: boolean;
   isLookup?: boolean;
   isPulldown?: boolean;
@@ -35,6 +36,7 @@ type Props = {
 
 export const Cell: FC<Props> = ({
   value,
+  status = "none",
   isEditing,
   isLookup,
   isPulldown,
@@ -59,6 +61,7 @@ export const Cell: FC<Props> = ({
       onMouseEnter={onMouseEnter}
       className={clsx(
         styles.cell,
+        status !== "none" && styles[`cell--${status}`],
         isLookup && styles["cell--lookup"],
         isPulldown && styles["cell--pulldown"],
       )}

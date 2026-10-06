@@ -26,6 +26,13 @@ export type Selection = {
 
 export type WorkbookStatus = "idle" | "selecting" | "editing";
 export type RowStatus = "added" | "edited" | "deleted" | "none";
+export type CellStatus = "none" | "edited" | "error";
+
+export type CellStatusInfo = {
+  status: CellStatus;
+  message?: string;
+};
+
 export type InsertPosition = "above" | "below";
 
 export type ViewMode = "editor" | "pdf-preview";

@@ -16,6 +16,7 @@ import {
   type ColumnId,
   cellEditsAtom,
   cellFamily,
+  cellStatusFamily,
   columnOrderAtom,
   isCellEditingFamily,
   type RowId,
@@ -42,6 +43,9 @@ const CellInner: FC<InnerProps> = memo(
   ({ row, col, rowId, colId, children }) => {
     const [value, setValue] = useAtom(
       useMemo(() => cellFamily({ rowId, colId }), [rowId, colId]),
+    );
+    const cellStatusInfo = useAtomValue(
+      useMemo(() => cellStatusFamily({ rowId, colId }), [rowId, colId]),
     );
     const isEditing = useAtomValue(
       useMemo(() => isCellEditingFamily({ row, col }), [row, col]),
@@ -171,6 +175,7 @@ const CellInner: FC<InnerProps> = memo(
       <>
         {children({
           value,
+          status: cellStatusInfo.status,
           isEditing,
           isLookup,
           isPulldown,
