@@ -108,17 +108,6 @@ const CellInner: FC<InnerProps> = memo(
       setEditingCell(null);
     }, [setEditingCell]);
 
-    const handleSelectPulldown = useCallback(
-      (newVal: string) => {
-        setValue(newVal);
-      },
-      [setValue],
-    );
-
-    const handleClosePulldown = useCallback(() => {
-      setEditingCell(null);
-    }, [setEditingCell]);
-
     const handleSelectionStart = useCallback(
       (event: MouseEvent<HTMLButtonElement>) => {
         if (event.button !== 0) return;
@@ -175,8 +164,6 @@ const CellInner: FC<InnerProps> = memo(
           isPulldown,
           pulldownMode,
           pulldownOptions,
-          onSelectPulldown: handleSelectPulldown,
-          onClosePulldown: handleClosePulldown,
           onCommit: handleCommit,
           onCancel: handleCancel,
           onDoubleClick: handleDoubleClick,

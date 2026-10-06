@@ -28,8 +28,6 @@ type Props = {
   isPulldown?: boolean;
   pulldownMode?: PulldownMode;
   pulldownOptions?: Option[];
-  onSelectPulldown?: (val: string) => void;
-  onClosePulldown?: () => void;
   onCommit?: (val: string) => void;
   onCancel?: () => void;
   onDoubleClick: () => void;
@@ -60,8 +58,6 @@ export const Cell: FC<Props> = ({
   isPulldown,
   pulldownMode,
   pulldownOptions,
-  onSelectPulldown,
-  onClosePulldown,
   onCommit,
   onCancel,
   onDoubleClick,
@@ -93,25 +89,15 @@ export const Cell: FC<Props> = ({
       isPulldown &&
       pulldownMode &&
       pulldownOptions &&
-      onSelectPulldown ? (
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <span className={styles.cell__content}>{value}</span>
-          <PulldownEditor
-            value={value}
-            mode={pulldownMode}
-            options={pulldownOptions}
-            onSelect={onSelectPulldown}
-            onClose={onClosePulldown ?? (() => {})}
-          />
-        </div>
+      onCommit ? (
+        <PulldownEditor
+          key={`${value}`}
+          initialValue={value}
+          mode={pulldownMode}
+          options={pulldownOptions}
+          onCommit={onCommit}
+          onCancel={onCancel ?? (() => {})}
+        />
       ) : isEditing && !isLookup && onCommit ? (
         <CellInputEditor
           key={`${value}`}
