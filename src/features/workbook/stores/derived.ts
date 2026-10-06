@@ -1,12 +1,17 @@
 import { atom } from "jotai";
 import { atomFamily } from "jotai-family";
+import { validateCellRules } from "../utils/validation";
 import {
   baseCellValuesAtom,
   baseColumnNamesAtom,
   baseColumnOrderAtom,
   baseRowOrderAtom,
 } from "./base";
-import { activeColumnConfigsAtom, getLookupValue } from "./binding";
+import {
+  activeColumnConfigsAtom,
+  getLookupValue,
+  referencedSheetsDataAtom,
+} from "./binding";
 import {
   cellCustomStatusesAtom,
   cellEditsAtom,
@@ -17,6 +22,7 @@ import {
 } from "./edit";
 import type { CellAddress, CellStatusInfo, ColumnId, RowId } from "./types";
 import { activeCellAtom, activeSheetIdAtom } from "./ui";
+import { activeColumnValidationsAtom } from "./validation";
 
 export const isCellEditingFamily = atomFamily(
   ({ row, col }: { row: number; col: number }) =>
@@ -182,13 +188,35 @@ export const cellStatusFamily = atomFamily(
           return { status: "none" };
         }
 
-        // 3. セルの値が初期値から変更されているか判定
+        // 3. 現在のセル値を取得
         const edits = get(cellEditsAtom);
-        if (key in edits) {
-          const baseValue = get(baseCellValuesAtom)[key] ?? "";
-          if (edits[key] !== baseValue) {
-            return { status: "edited" };
-          }
+        const baseValue = get(baseCellValuesAtom)[key] ?? "";
+        const cellValue = key in edits ? edits[key] : baseValue;
+
+        // 4. 列のバリデーションルールを順次検証
+        const validations = get(activeColumnValidationsAtom)[address.colId];
+        const pulldownConfig =
+          colConfig?.type === "pulldown" ? colConfig.pulldown : undefined;
+        const masterSheetData = pulldownConfig
+          ? get(referencedSheetsDataAtom)[pulldownConfig.sourceSheetId]
+          : undefined;
+
+        const validationResult = validateCellRules(validations, cellValue, {
+          pulldownConfig,
+          masterSheetData,
+          cellEdits: edits,
+        });
+
+        if (!validationResult.valid) {
+          return {
+            status: "error",
+            errorInfo: validationResult.errorInfo,
+          };
+        }
+
+        // 5. セルの値が初期値から変更されているか判定
+        if (key in edits && edits[key] !== baseValue) {
+          return { status: "edited" };
         }
 
         return { status: "none" };

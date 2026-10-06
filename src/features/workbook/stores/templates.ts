@@ -16,6 +16,7 @@ import {
 import { columnTotalsAtom } from "./summary";
 import type { SheetCategory, SheetTemplate } from "./types";
 import { activeSheetIdAtom } from "./ui";
+import { columnValidationsAtom } from "./validation";
 
 // --- 雛形管理 Atom 群（Template State Atoms） ---
 
@@ -199,6 +200,10 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
   const totals = { ...get(columnTotalsAtom) };
   delete totals[sheetId];
   set(columnTotalsAtom, totals);
+
+  const validations = { ...get(columnValidationsAtom) };
+  delete validations[sheetId];
+  set(columnValidationsAtom, validations);
 
   // 4. 編集差分状態のクリーンアップ
   const modRowOrders = { ...get(modifiedRowOrdersAtom) };

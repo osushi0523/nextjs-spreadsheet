@@ -1,9 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
-  type ChangeEvent,
   type ComponentProps,
   type FC,
-  type KeyboardEvent,
   type MouseEvent,
   memo,
   type ReactNode,
@@ -96,25 +94,19 @@ const CellInner: FC<InnerProps> = memo(
       setEditingCell({ row, col });
     }, [isLookup, row, col, setEditingCell]);
 
-    const handleBlur = useCallback(() => {
+    const handleCommit = useCallback(
+      (newVal: string) => {
+        if (newVal !== value) {
+          setValue(newVal);
+        }
+        setEditingCell(null);
+      },
+      [value, setValue, setEditingCell],
+    );
+
+    const handleCancel = useCallback(() => {
       setEditingCell(null);
     }, [setEditingCell]);
-
-    const handleKeyDown = useCallback(
-      (event: KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === "Enter") {
-          setEditingCell(null);
-        }
-      },
-      [setEditingCell],
-    );
-
-    const handleChange = useCallback(
-      (event: ChangeEvent<HTMLInputElement>) => {
-        setValue(event.target.value);
-      },
-      [setValue],
-    );
 
     const handleSelectPulldown = useCallback(
       (newVal: string) => {
@@ -175,7 +167,9 @@ const CellInner: FC<InnerProps> = memo(
       <>
         {children({
           value,
-          status: cellStatusInfo.status,
+          status: isEditing ? "none" : cellStatusInfo.status,
+          statusMessage: isEditing ? undefined : cellStatusInfo.message,
+          errorInfo: isEditing ? undefined : cellStatusInfo.errorInfo,
           isEditing,
           isLookup,
           isPulldown,
@@ -183,10 +177,9 @@ const CellInner: FC<InnerProps> = memo(
           pulldownOptions,
           onSelectPulldown: handleSelectPulldown,
           onClosePulldown: handleClosePulldown,
-          onChange: handleChange,
+          onCommit: handleCommit,
+          onCancel: handleCancel,
           onDoubleClick: handleDoubleClick,
-          onBlur: handleBlur,
-          onKeyDown: handleKeyDown,
           onMouseDown: handleSelectionStart,
           onMouseEnter: handleSelectionMove,
         })}

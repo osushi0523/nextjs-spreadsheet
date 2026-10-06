@@ -1,13 +1,15 @@
-import { CaretDownIcon } from "@radix-ui/react-icons";
+import { CaretDownIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { Tooltip } from "@radix-ui/themes";
 import clsx from "clsx";
+import type { FC, MouseEvent } from "react";
+import { useI18n } from "@/i18n/useI18n";
 import type {
-  ChangeEvent,
-  FC,
-  FocusEvent,
-  KeyboardEvent,
-  MouseEvent,
-} from "react";
-import type { CellStatus, PulldownMode } from "../../stores";
+  CellStatus,
+  PulldownMode,
+  ValidationErrorInfo,
+  ValidationErrorKey,
+} from "../../stores";
+import { CellInputEditor } from "./CellInputEditor";
 import styles from "./index.module.css";
 import { PulldownEditor } from "./PulldownEditor";
 
@@ -19,6 +21,8 @@ type Option = {
 type Props = {
   value: string;
   status?: CellStatus;
+  statusMessage?: string;
+  errorInfo?: ValidationErrorInfo;
   isEditing: boolean;
   isLookup?: boolean;
   isPulldown?: boolean;
@@ -26,17 +30,31 @@ type Props = {
   pulldownOptions?: Option[];
   onSelectPulldown?: (val: string) => void;
   onClosePulldown?: () => void;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onCommit?: (val: string) => void;
+  onCancel?: () => void;
   onDoubleClick: () => void;
-  onBlur: (event: FocusEvent<HTMLInputElement>) => void;
-  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onMouseDown: (event: MouseEvent<HTMLButtonElement>) => void;
   onMouseEnter?: (event: MouseEvent<HTMLButtonElement>) => void;
 };
 
+const validationMessageKeyMap = {
+  required: "validationRequired",
+  number: "validationNumber",
+  string: "validationString",
+  alphanumeric: "validationAlphanumeric",
+  alpha: "validationAlpha",
+  numeric: "validationNumeric",
+  maxLength: "validationMaxLength",
+  minLength: "validationMinLength",
+  reference: "validationReference",
+  invalid: "validationInvalid",
+} as const satisfies Record<ValidationErrorKey, string>;
+
 export const Cell: FC<Props> = ({
   value,
   status = "none",
+  statusMessage,
+  errorInfo,
   isEditing,
   isLookup,
   isPulldown,
@@ -44,14 +62,18 @@ export const Cell: FC<Props> = ({
   pulldownOptions,
   onSelectPulldown,
   onClosePulldown,
-  onChange,
+  onCommit,
+  onCancel,
   onDoubleClick,
-  onBlur,
-  onKeyDown,
   onMouseDown,
   onMouseEnter,
 }) => {
+  const { t } = useI18n();
   const handleDoubleClick = isLookup ? undefined : onDoubleClick;
+
+  const resolvedErrorMessage = errorInfo
+    ? t(validationMessageKeyMap[errorInfo.key], errorInfo.params)
+    : statusMessage;
 
   return (
     <button
@@ -61,7 +83,8 @@ export const Cell: FC<Props> = ({
       onMouseEnter={onMouseEnter}
       className={clsx(
         styles.cell,
-        status !== "none" && styles[`cell--${status}`],
+        status === "edited" && styles["cell--edited"],
+        status === "error" && styles["cell--error"],
         isLookup && styles["cell--lookup"],
         isPulldown && styles["cell--pulldown"],
       )}
@@ -89,20 +112,23 @@ export const Cell: FC<Props> = ({
             onClose={onClosePulldown ?? (() => {})}
           />
         </div>
-      ) : isEditing && !isLookup ? (
-        <input
-          type="text"
-          // biome-ignore lint/a11y/noAutofocus: 編集モード切替時に即座に入力可能にするため
-          autoFocus
-          value={value}
-          onChange={onChange}
-          onBlur={onBlur}
-          onKeyDown={onKeyDown}
-          className={styles.cell__input}
+      ) : isEditing && !isLookup && onCommit ? (
+        <CellInputEditor
+          key={`${value}`}
+          initialValue={value}
+          onCommit={onCommit}
+          onCancel={onCancel ?? (() => {})}
         />
       ) : (
         <>
           <span className={styles.cell__content}>{value}</span>
+          {status === "error" && resolvedErrorMessage && (
+            <Tooltip content={resolvedErrorMessage}>
+              <span className={styles.cell__errorIndicator}>
+                <ExclamationTriangleIcon width={14} height={14} />
+              </span>
+            </Tooltip>
+          )}
           {isPulldown && (
             <span className={styles.cell__pulldownIndicator}>
               <CaretDownIcon width={12} height={12} />

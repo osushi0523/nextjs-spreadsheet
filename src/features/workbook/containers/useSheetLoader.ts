@@ -9,9 +9,11 @@ import {
   baseRowOrderAtom,
   type ColumnConfig,
   type ColumnId,
+  type ColumnValidationRule,
   closeSheetAtom,
   columnConfigsAtom,
   columnTotalsAtom,
+  columnValidationsAtom,
   createColumnId,
   createRowId,
   openSheetAtom,
@@ -40,6 +42,7 @@ export const buildSheetData = (
   fieldToColId: Record<string, ColumnId>;
   configs: Record<ColumnId, ColumnConfig>;
   totals: Record<ColumnId, boolean>;
+  validations: Record<ColumnId, ColumnValidationRule[]>;
 } | null => {
   const columns = template.columns;
   const rawRecords = fetchMockSheetRecords(
@@ -53,6 +56,7 @@ export const buildSheetData = (
   const fieldToColId: Record<string, ColumnId> = {};
   const configs: Record<ColumnId, ColumnConfig> = {};
   const totals: Record<ColumnId, boolean> = {};
+  const validations: Record<ColumnId, ColumnValidationRule[]> = {};
   const initialValues: Record<string, string> = {};
 
   // 1. 列情報の初期化
@@ -63,6 +67,10 @@ export const buildSheetData = (
 
     colNames[colId] = colDef.headerName;
     fieldToColId[colDef.field] = colId;
+
+    if (colDef.validations && colDef.validations.length > 0) {
+      validations[colId] = colDef.validations;
+    }
 
     if (colDef.hasTotal) {
       totals[colId] = true;
@@ -158,6 +166,7 @@ export const buildSheetData = (
     fieldToColId,
     configs,
     totals,
+    validations,
   };
 };
 
@@ -179,6 +188,7 @@ export const useSheetLoader = () => {
   const setBaseValues = useSetAtom(baseCellValuesAtom);
   const setColumnConfigs = useSetAtom(columnConfigsAtom);
   const setColumnTotals = useSetAtom(columnTotalsAtom);
+  const setColumnValidations = useSetAtom(columnValidationsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
   const setOpenSheet = useSetAtom(openSheetAtom);
   const setCloseSheet = useSetAtom(closeSheetAtom);
@@ -195,6 +205,10 @@ export const useSheetLoader = () => {
       const currentDataMap = { ...sheetDataMap };
       const newConfigs: Record<string, Record<ColumnId, ColumnConfig>> = {};
       const newTotals: Record<string, Record<ColumnId, boolean>> = {};
+      const newValidations: Record<
+        string,
+        Record<ColumnId, ColumnValidationRule[]>
+      > = {};
 
       const resolveSheet = (targetId: string): SheetData | null => {
         if (currentDataMap[targetId]) {
@@ -225,6 +239,7 @@ export const useSheetLoader = () => {
         currentFieldMap[targetId] = built.fieldToColId;
         newConfigs[targetId] = built.configs;
         newTotals[targetId] = built.totals;
+        newValidations[targetId] = built.validations;
 
         return built.data;
       };
@@ -237,6 +252,7 @@ export const useSheetLoader = () => {
       setFieldToColMap((prev) => ({ ...prev, ...currentFieldMap }));
       setColumnConfigs((prev) => ({ ...prev, ...newConfigs }));
       setColumnTotals((prev) => ({ ...prev, ...newTotals }));
+      setColumnValidations((prev) => ({ ...prev, ...newValidations }));
       setReferencedSheets((prev) => ({ ...prev, ...currentDataMap }));
 
       return result;
@@ -249,6 +265,7 @@ export const useSheetLoader = () => {
       setFieldToColMap,
       setColumnConfigs,
       setColumnTotals,
+      setColumnValidations,
       setReferencedSheets,
     ],
   );
