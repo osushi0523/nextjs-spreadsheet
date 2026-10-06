@@ -2,12 +2,12 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo, useState } from "react";
 import {
   activeSheetIdAtom,
+  allSheetTemplatesAtom,
   applyColumnBindingAtom,
   type ColumnConfig,
   type ColumnId,
   columnConfigsAtom,
   columnNamesAtom,
-  DEFAULT_SHEET_TEMPLATES,
   type PulldownMode,
   referencedSheetsDataAtom,
 } from "../../stores";
@@ -30,6 +30,7 @@ export const useColumnSettingModalContainer = ({
   targetColId,
 }: UseColumnSettingModalContainerArgs): ColumnSettingModalPresenterProps => {
   const activeSheetId = useAtomValue(activeSheetIdAtom);
+  const allTemplates = useAtomValue(allSheetTemplatesAtom);
   const columnNames = useAtomValue(columnNamesAtom);
   const columnConfigs = useAtomValue(columnConfigsAtom);
   const referencedSheets = useAtomValue(referencedSheetsDataAtom);
@@ -41,13 +42,13 @@ export const useColumnSettingModalContainer = ({
     : undefined;
 
   const candidateSheets: CandidateSheet[] = useMemo(() => {
-    return Object.values(DEFAULT_SHEET_TEMPLATES)
+    return allTemplates
       .filter((s) => s.id !== activeSheetId)
       .map((s) => ({
         id: s.id,
         name: s.name,
       }));
-  }, [activeSheetId]);
+  }, [allTemplates, activeSheetId]);
 
   const defaultSheetId = useMemo(() => {
     return candidateSheets[0]?.id ?? "";

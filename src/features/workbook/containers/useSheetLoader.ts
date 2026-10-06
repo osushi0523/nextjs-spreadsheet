@@ -14,16 +14,16 @@ import {
   columnTotalsAtom,
   createColumnId,
   createRowId,
-  DEFAULT_SHEET_TEMPLATES,
-  INITIAL_OPEN_SHEET_IDS,
   openSheetAtom,
   openSheetIdsAtom,
   openSheetsAtom,
   referencedSheetsDataAtom,
   type SheetData,
+  type SheetTemplate,
   sheetDataMapAtom,
   sheetFieldToColIdMapAtom,
   sheetsByCategoryAtom,
+  sheetTemplatesAtom,
 } from "../stores";
 
 /**
@@ -31,6 +31,7 @@ import {
  */
 export const buildSheetData = (
   sheetId: string,
+  template: SheetTemplate,
   getFieldToColMap: (
     templateId: string,
   ) => Record<string, ColumnId> | undefined,
@@ -40,9 +41,6 @@ export const buildSheetData = (
   configs: Record<ColumnId, ColumnConfig>;
   totals: Record<ColumnId, boolean>;
 } | null => {
-  const template = DEFAULT_SHEET_TEMPLATES[sheetId];
-  if (!template) return null;
-
   const columns = template.columns;
   const rawRecords = fetchMockSheetRecords(
     sheetId,
@@ -163,10 +161,18 @@ export const buildSheetData = (
   };
 };
 
+/**
+ * 選択されたシートのデータ構築・状態管理およびキャッシュを行うフック
+ */
 export const useSheetLoader = () => {
   const [activeSheetId, setActiveSheetId] = useAtom(activeSheetIdAtom);
   const [sheetDataMap, setSheetDataMap] = useAtom(sheetDataMapAtom);
   const [fieldToColMap, setFieldToColMap] = useAtom(sheetFieldToColIdMapAtom);
+  const sheetTemplates = useAtomValue(sheetTemplatesAtom);
+  const openSheetIds = useAtomValue(openSheetIdsAtom);
+  const openSheets = useAtomValue(openSheetsAtom);
+  const sheetsByCategory = useAtomValue(sheetsByCategoryAtom);
+
   const setBaseRowOrder = useSetAtom(baseRowOrderAtom);
   const setBaseColumnOrder = useSetAtom(baseColumnOrderAtom);
   const setBaseColumnNames = useSetAtom(baseColumnNamesAtom);
@@ -174,7 +180,8 @@ export const useSheetLoader = () => {
   const setColumnConfigs = useSetAtom(columnConfigsAtom);
   const setColumnTotals = useSetAtom(columnTotalsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
-  const openSheets = useAtomValue(openSheetsAtom);
+  const setOpenSheet = useSetAtom(openSheetAtom);
+  const setCloseSheet = useSetAtom(closeSheetAtom);
 
   const getOrInitSheetData = useCallback(
     (sheetId: string): SheetData | null => {
@@ -194,7 +201,7 @@ export const useSheetLoader = () => {
           return currentDataMap[targetId];
         }
 
-        const template = DEFAULT_SHEET_TEMPLATES[targetId];
+        const template = sheetTemplates[targetId];
         if (!template) return null;
 
         // 依存先マスタを先に再帰解決
@@ -207,7 +214,11 @@ export const useSheetLoader = () => {
           }
         }
 
-        const built = buildSheetData(targetId, (id) => currentFieldMap[id]);
+        const built = buildSheetData(
+          targetId,
+          template,
+          (id) => currentFieldMap[id],
+        );
         if (!built) return null;
 
         currentDataMap[targetId] = built.data;
@@ -233,6 +244,7 @@ export const useSheetLoader = () => {
     [
       sheetDataMap,
       fieldToColMap,
+      sheetTemplates,
       setSheetDataMap,
       setFieldToColMap,
       setColumnConfigs,
@@ -263,16 +275,15 @@ export const useSheetLoader = () => {
     ],
   );
 
+  // 初期アクティブシートの自動ロード
   useEffect(() => {
-    if (!activeSheetId) {
-      loadSheetData(INITIAL_OPEN_SHEET_IDS[0]);
+    if (!activeSheetId && openSheetIds.length > 0) {
+      const initialSheetId = openSheetIds[0];
+      if (initialSheetId && sheetTemplates[initialSheetId]) {
+        loadSheetData(initialSheetId);
+      }
     }
-  }, [activeSheetId, loadSheetData]);
-
-  const setOpenSheet = useSetAtom(openSheetAtom);
-  const setCloseSheet = useSetAtom(closeSheetAtom);
-  const openSheetIds = useAtomValue(openSheetIdsAtom);
-  const sheetsByCategory = useAtomValue(sheetsByCategoryAtom);
+  }, [activeSheetId, openSheetIds, sheetTemplates, loadSheetData]);
 
   const handleSelectSheet = useCallback(
     (id: string) => {
@@ -303,9 +314,7 @@ export const useSheetLoader = () => {
     [activeSheetId, openSheetIds, loadSheetData, setCloseSheet],
   );
 
-  const activeSheet = activeSheetId
-    ? DEFAULT_SHEET_TEMPLATES[activeSheetId]
-    : undefined;
+  const activeSheet = activeSheetId ? sheetTemplates[activeSheetId] : undefined;
 
   return {
     activeSheet,

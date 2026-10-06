@@ -8,7 +8,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { type FC, useCallback, useMemo, useState } from "react";
 import { CellContainer } from "../Cell/containers";
-import { Workbook } from "../components";
+import { EmptySheet, Workbook } from "../components";
 import { SheetMenuDrawer } from "../components/SheetMenuDrawer";
 import { SheetTabs } from "../components/SheetTabs";
 import { Toolbar } from "../components/Toolbar";
@@ -41,8 +41,10 @@ import {
 import { useExportExcel } from "./useExportExcel";
 import { useExportPdf } from "./useExportPdf";
 import { useSheetLoader } from "./useSheetLoader";
+import { useWorkbookMetadataLoader } from "./useWorkbookMetadataLoader";
 
 export const WorkbookContainer: FC = () => {
+  useWorkbookMetadataLoader();
   const {
     activeSheet,
     activeSheetId,
@@ -205,24 +207,28 @@ export const WorkbookContainer: FC = () => {
             />
           }
           sheet={
-            <SortableContext
-              items={sortableColumnOrder}
-              strategy={horizontalListSortingStrategy}
-            >
-              <Sheet
-                ref={parentRef}
-                rows={composedRows}
-                columns={composedColumns}
-                totalWidth={columnVirtualizer.getTotalSize()}
-                totalHeight={rowVirtualizer.getTotalSize()}
-                getRowLayout={getRowLayout}
-                getColumnLayout={getColumnLayout}
-                onChangeColumnWidth={handleChangeColumnWidth}
-                renderHeaderCell={renderHeaderCell}
-                hasFooter={hasFooter}
-                renderFooterCell={renderFooterCell}
-              />
-            </SortableContext>
+            activeSheetId ? (
+              <SortableContext
+                items={sortableColumnOrder}
+                strategy={horizontalListSortingStrategy}
+              >
+                <Sheet
+                  ref={parentRef}
+                  rows={composedRows}
+                  columns={composedColumns}
+                  totalWidth={columnVirtualizer.getTotalSize()}
+                  totalHeight={rowVirtualizer.getTotalSize()}
+                  getRowLayout={getRowLayout}
+                  getColumnLayout={getColumnLayout}
+                  onChangeColumnWidth={handleChangeColumnWidth}
+                  renderHeaderCell={renderHeaderCell}
+                  hasFooter={hasFooter}
+                  renderFooterCell={renderFooterCell}
+                />
+              </SortableContext>
+            ) : (
+              <EmptySheet onOpenMenu={() => setIsDrawerOpen(true)} />
+            )
           }
         />
       </DndContext>

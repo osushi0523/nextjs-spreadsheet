@@ -1,6 +1,9 @@
 .sheetTabsContainer {
   display: flex;
   align-items: center;
+  min-height: 40px;
+  height: 40px;
+  box-sizing: border-box;
   background-color: var(--gray-2);
   border-bottom: 1px solid var(--gray-4);
   padding-left: 8px;

@@ -1,0 +1,20 @@
+.container {
+  height: 100%;
+  width: 100%;
+  background-color: var(--gray-2);
+  color: var(--gray-11);
+  gap: 12px;
+}
+
+.iconWrapper {
+  color: var(--gray-9);
+}
+
+.message {
+  font-weight: 500;
+  color: var(--gray-11);
+}
+
+.openMenuButton {
+  cursor: pointer;
+}

@@ -44,7 +44,7 @@ export const SheetTabs: FC<SheetTabsProps> = ({
           >
             <span className={styles.tabItem}>
               <span className={styles.tabTitle}>{sheet.name}</span>
-              {onCloseSheet && sheets.length > 1 && (
+              {onCloseSheet && (
                 <button
                   type="button"
                   className={styles.tabCloseButton}
