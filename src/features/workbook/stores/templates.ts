@@ -141,14 +141,56 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
     }
   }
 
-  // 3. メモリ解放（GC対象にするため、閉じたシートのAtomキーを削除）
-  const sheetDataMap = { ...get(sheetDataMapAtom) };
-  delete sheetDataMap[sheetId];
-  set(sheetDataMapAtom, sheetDataMap);
+  // 3. メモリ解放（他の開いているシートから参照されていない場合のみ解放）
+  const allConfigs = get(columnConfigsAtom);
+  const allTemplates = get(sheetTemplatesAtom);
+  const isReferenced = nextOpenIds.some((openId) => {
+    // 列設定での参照チェック
+    const configs = allConfigs[openId];
+    if (configs) {
+      for (const config of Object.values(configs)) {
+        if (
+          config.type === "pulldown" &&
+          config.pulldown.sourceSheetId === sheetId
+        ) {
+          return true;
+        }
+        if (
+          config.type === "lookup" &&
+          config.lookup.sourceSheetId === sheetId
+        ) {
+          return true;
+        }
+      }
+    }
+    // テンプレート定義での参照チェック
+    const template = allTemplates[openId];
+    if (template) {
+      for (const col of template.columns) {
+        if (
+          (col.type.type === "pulldown" || col.type.type === "lookup") &&
+          col.type.sourceTemplateId === sheetId
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
 
-  const fieldToColMap = { ...get(sheetFieldToColIdMapAtom) };
-  delete fieldToColMap[sheetId];
-  set(sheetFieldToColIdMapAtom, fieldToColMap);
+  if (!isReferenced) {
+    const referencedSheets = { ...get(referencedSheetsDataAtom) };
+    delete referencedSheets[sheetId];
+    set(referencedSheetsDataAtom, referencedSheets);
+
+    const sheetDataMap = { ...get(sheetDataMapAtom) };
+    delete sheetDataMap[sheetId];
+    set(sheetDataMapAtom, sheetDataMap);
+
+    const fieldToColMap = { ...get(sheetFieldToColIdMapAtom) };
+    delete fieldToColMap[sheetId];
+    set(sheetFieldToColIdMapAtom, fieldToColMap);
+  }
 
   const configs = { ...get(columnConfigsAtom) };
   delete configs[sheetId];
@@ -157,10 +199,6 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
   const totals = { ...get(columnTotalsAtom) };
   delete totals[sheetId];
   set(columnTotalsAtom, totals);
-
-  const referencedSheets = { ...get(referencedSheetsDataAtom) };
-  delete referencedSheets[sheetId];
-  set(referencedSheetsDataAtom, referencedSheets);
 
   // 4. 編集差分状態のクリーンアップ
   const modRowOrders = { ...get(modifiedRowOrdersAtom) };
