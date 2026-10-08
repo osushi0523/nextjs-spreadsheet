@@ -1,4 +1,4 @@
-import type { SheetTemplate } from "../types";
+import type { SheetTemplate } from "./types";
 
 export const productMasterTemplate: SheetTemplate = {
   id: "product-master",
