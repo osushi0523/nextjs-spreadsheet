@@ -1,8 +1,10 @@
 import { atom } from "jotai";
 import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
 import { columnNamesAtom, columnOrderAtom, rowOrderAtom } from "./derived";
-import { cellEditsAtom, rowStatusesAtom } from "./edit";
+import { cellCustomStatusesAtom, cellEditsAtom, rowStatusesAtom } from "./edit";
 import {
+  type CellAddress,
+  type CellStatusInfo,
   type ColumnId,
   createColumnId,
   createRowId,
@@ -325,3 +327,47 @@ export const reorderColumnsWithFollowersAtom = atom(
     set(columnOrderAtom, newOrder);
   },
 );
+
+export const setCellStatusAtom = atom(
+  null,
+  (
+    get,
+    set,
+    {
+      address,
+      statusInfo,
+    }: { address: CellAddress; statusInfo: CellStatusInfo },
+  ) => {
+    const key = `${address.rowId}-${address.colId}`;
+    const customStatuses = get(cellCustomStatusesAtom);
+    if (statusInfo.status === "none" && !statusInfo.message) {
+      const next = { ...customStatuses };
+      delete next[key];
+      set(cellCustomStatusesAtom, next);
+    } else {
+      set(cellCustomStatusesAtom, {
+        ...customStatuses,
+        [key]: statusInfo,
+      });
+    }
+  },
+);
+
+export const setCellValidationErrorsAtom = atom(
+  null,
+  (get, set, errors: Record<string, string>) => {
+    const customStatuses = { ...get(cellCustomStatusesAtom) };
+    for (const [key, message] of Object.entries(errors)) {
+      if (message) {
+        customStatuses[key] = { status: "error", message };
+      } else if (customStatuses[key]?.status === "error") {
+        delete customStatuses[key];
+      }
+    }
+    set(cellCustomStatusesAtom, customStatuses);
+  },
+);
+
+export const clearCellCustomStatusesAtom = atom(null, (_get, set) => {
+  set(cellCustomStatusesAtom, {});
+});

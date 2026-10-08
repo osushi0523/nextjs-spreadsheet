@@ -7,6 +7,8 @@ export const localMessages = {
     printPreview: '"{sheetName}" の印刷プレビュー (PDF)',
     defaultSheetName: "シート",
     sheetMenu: "シート一覧",
+    noOpenSheets: "開いているシートがありません",
+    openSheetMenu: "シートメニューを開く",
   },
   en: {
     exportExcel: "Export to Excel",
@@ -16,5 +18,7 @@ export const localMessages = {
     printPreview: 'Print Preview "{sheetName}" (PDF)',
     defaultSheetName: "Sheet",
     sheetMenu: "Sheets",
+    noOpenSheets: "No sheets are currently open",
+    openSheetMenu: "Open sheet menu",
   },
 } as const;

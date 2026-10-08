@@ -18,3 +18,5 @@ export const Workbook: FC<WorkbookProps> = ({ toolbar, tabs, sheet }) => {
     </Flex>
   );
 };
+
+export * from "./EmptySheet";

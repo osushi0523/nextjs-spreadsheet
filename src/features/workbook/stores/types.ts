@@ -26,6 +26,30 @@ export type Selection = {
 
 export type WorkbookStatus = "idle" | "selecting" | "editing";
 export type RowStatus = "added" | "edited" | "deleted" | "none";
+export type CellStatus = "none" | "edited" | "error";
+export type ValidationErrorKey =
+  | "required"
+  | "number"
+  | "string"
+  | "alphanumeric"
+  | "alpha"
+  | "numeric"
+  | "maxLength"
+  | "minLength"
+  | "reference"
+  | "invalid";
+
+export type ValidationErrorInfo = {
+  key: ValidationErrorKey;
+  params?: Record<string, string | number>;
+};
+
+export type CellStatusInfo = {
+  status: CellStatus;
+  message?: string;
+  errorInfo?: ValidationErrorInfo;
+};
+
 export type InsertPosition = "above" | "below";
 
 export type ViewMode = "editor" | "pdf-preview";
@@ -71,6 +95,17 @@ export type SheetData = {
 
 // --- Sheet & Column Template Types (雛形スキーマ型定義) ---
 
+export type ColumnValidationRule =
+  | { type: "required" }
+  | { type: "number" }
+  | { type: "string" }
+  | { type: "alphanumeric" }
+  | { type: "alpha" }
+  | { type: "numeric" }
+  | { type: "maxLength"; length: number }
+  | { type: "minLength"; length: number }
+  | { type: "reference" };
+
 export type ColumnTemplateType =
   | { type: "text" }
   | { type: "number"; format?: "currency" | "integer" | "decimal" }
@@ -96,6 +131,7 @@ export type ColumnTemplate = {
   field: string;
   headerName: string;
   type: ColumnTemplateType;
+  validations?: ColumnValidationRule[];
   width?: number;
   hasTotal?: boolean;
   readOnly?: boolean;

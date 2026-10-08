@@ -1,21 +1,28 @@
 import { atom } from "jotai";
 import { atomFamily } from "jotai-family";
+import { validateCellRules } from "../utils/validation";
 import {
   baseCellValuesAtom,
   baseColumnNamesAtom,
   baseColumnOrderAtom,
   baseRowOrderAtom,
 } from "./base";
-import { activeColumnConfigsAtom, getLookupValue } from "./binding";
 import {
+  activeColumnConfigsAtom,
+  getLookupValue,
+  referencedSheetsDataAtom,
+} from "./binding";
+import {
+  cellCustomStatusesAtom,
   cellEditsAtom,
   modifiedColumnNamesAtom,
   modifiedColumnOrdersAtom,
   modifiedRowOrdersAtom,
   rowStatusesAtom,
 } from "./edit";
-import type { CellAddress, ColumnId, RowId } from "./types";
+import type { CellAddress, CellStatusInfo, ColumnId, RowId } from "./types";
 import { activeCellAtom, activeSheetIdAtom } from "./ui";
+import { activeColumnValidationsAtom } from "./validation";
 
 export const isCellEditingFamily = atomFamily(
   ({ row, col }: { row: number; col: number }) =>
@@ -154,6 +161,76 @@ export const cellFamily = atomFamily(
           set(rowStatusesAtom, {
             ...rowStatuses,
             [address.rowId]: "edited",
+          });
+        }
+      },
+    );
+  },
+  (a, b) => a.rowId === b.rowId && a.colId === b.colId,
+);
+
+export const cellStatusFamily = atomFamily(
+  (address: CellAddress) => {
+    const key = `${address.rowId}-${address.colId}` as const;
+
+    return atom(
+      (get): CellStatusInfo => {
+        // 1. バリデーションエラーや明示的なカスタムステータスを優先
+        const customStatuses = get(cellCustomStatusesAtom);
+        if (customStatuses[key] && customStatuses[key].status !== "none") {
+          return customStatuses[key];
+        }
+
+        // 2. Lookup 列は読み取り専用のため変更なし扱い
+        const configs = get(activeColumnConfigsAtom);
+        const colConfig = configs[address.colId];
+        if (colConfig && colConfig.type === "lookup") {
+          return { status: "none" };
+        }
+
+        // 3. 現在のセル値を取得
+        const edits = get(cellEditsAtom);
+        const baseValue = get(baseCellValuesAtom)[key] ?? "";
+        const cellValue = key in edits ? edits[key] : baseValue;
+
+        // 4. 列のバリデーションルールを順次検証
+        const validations = get(activeColumnValidationsAtom)[address.colId];
+        const pulldownConfig =
+          colConfig?.type === "pulldown" ? colConfig.pulldown : undefined;
+        const masterSheetData = pulldownConfig
+          ? get(referencedSheetsDataAtom)[pulldownConfig.sourceSheetId]
+          : undefined;
+
+        const validationResult = validateCellRules(validations, cellValue, {
+          pulldownConfig,
+          masterSheetData,
+          cellEdits: edits,
+        });
+
+        if (!validationResult.valid) {
+          return {
+            status: "error",
+            errorInfo: validationResult.errorInfo,
+          };
+        }
+
+        // 5. セルの値が初期値から変更されているか判定
+        if (key in edits && edits[key] !== baseValue) {
+          return { status: "edited" };
+        }
+
+        return { status: "none" };
+      },
+      (get, set, nextStatus: CellStatusInfo) => {
+        const customStatuses = get(cellCustomStatusesAtom);
+        if (nextStatus.status === "none" && !nextStatus.message) {
+          const updated = { ...customStatuses };
+          delete updated[key];
+          set(cellCustomStatusesAtom, updated);
+        } else {
+          set(cellCustomStatusesAtom, {
+            ...customStatuses,
+            [key]: nextStatus,
           });
         }
       },

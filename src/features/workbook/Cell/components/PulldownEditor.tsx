@@ -1,7 +1,16 @@
 import { CheckIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { Box, Flex, Popover, Text, TextField } from "@radix-ui/themes";
-import { type FC, type KeyboardEvent, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type FC,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { PulldownMode } from "../../stores";
+import styles from "./index.module.css";
 
 type Option = {
   key: string;
@@ -9,96 +18,172 @@ type Option = {
 };
 
 type Props = {
-  value: string;
+  initialValue: string;
   mode: PulldownMode;
   options: Option[];
-  onSelect: (val: string) => void;
-  onClose: () => void;
+  onCommit: (val: string) => void;
+  onCancel: () => void;
 };
 
 export const PulldownEditor: FC<Props> = ({
-  value,
+  initialValue,
   mode,
   options,
-  onSelect,
-  onClose,
+  onCommit,
+  onCancel,
 }) => {
+  const [inputValue, setInputValue] = useState(initialValue);
   const [search, setSearch] = useState("");
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  const isFinishedRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const commitValue = (val: string) => {
+    if (isFinishedRef.current) return;
+    isFinishedRef.current = true;
+    onCommit(val);
+  };
+
+  const cancelEdit = () => {
+    if (isFinishedRef.current) return;
+    isFinishedRef.current = true;
+    onCancel();
+  };
+
   const filteredOptions = useMemo(() => {
-    if (!search.trim()) return options;
+    if (mode !== "combobox" || !search.trim()) return options;
     const q = search.toLowerCase();
     return options.filter(
       (opt) =>
         opt.key.toLowerCase().includes(q) ||
         opt.label.toLowerCase().includes(q),
     );
-  }, [options, search]);
+  }, [options, search, mode]);
 
-  const handleSearchChange = (val: string) => {
-    setSearch(val);
-    setHighlightedIndex(0);
+  const handleCellChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleCellKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((prev) =>
-        prev < filteredOptions.length - 1 ? prev + 1 : prev,
-      );
+      setHighlightedIndex((prev) => {
+        if (filteredOptions.length === 0) return null;
+        if (prev === null) return 0;
+        return prev < filteredOptions.length - 1 ? prev + 1 : prev;
+      });
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+      setHighlightedIndex((prev) => {
+        if (filteredOptions.length === 0) return null;
+        if (prev === null || prev <= 0) return 0;
+        return prev - 1;
+      });
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const selected = filteredOptions[highlightedIndex];
-      if (selected) {
-        onSelect(selected.key);
+      if (
+        highlightedIndex !== null &&
+        filteredOptions[highlightedIndex] !== undefined
+      ) {
+        commitValue(filteredOptions[highlightedIndex].key);
+      } else {
+        commitValue(inputValue);
       }
-      onClose();
     } else if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      cancelEdit();
     }
   };
 
+  const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => {
+        if (filteredOptions.length === 0) return null;
+        if (prev === null) return 0;
+        return prev < filteredOptions.length - 1 ? prev + 1 : prev;
+      });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => {
+        if (filteredOptions.length === 0) return null;
+        if (prev === null || prev <= 0) return 0;
+        return prev - 1;
+      });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (
+        highlightedIndex !== null &&
+        filteredOptions[highlightedIndex] !== undefined
+      ) {
+        commitValue(filteredOptions[highlightedIndex].key);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  };
+
+  useEffect(() => {
+    if (highlightedIndex !== null && listRef.current) {
+      const el = listRef.current.children[highlightedIndex] as
+        | HTMLElement
+        | undefined;
+      el?.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightedIndex]);
+
   return (
-    <Popover.Root open={true} onOpenChange={(open) => !open && onClose()}>
+    <Popover.Root
+      open={true}
+      onOpenChange={(open) => {
+        if (!open) {
+          commitValue(inputValue);
+        }
+      }}
+    >
       <Popover.Trigger>
-        <button
-          type="button"
-          tabIndex={-1}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+        <input
+          ref={inputRef}
+          type="text"
+          // biome-ignore lint/a11y/noAutofocus: 編集モード切替時に即座に入力可能にするため
+          autoFocus
+          value={inputValue}
+          onChange={handleCellChange}
+          onKeyDown={handleCellKeyDown}
+          className={styles.cell__input}
         />
       </Popover.Trigger>
 
       <Popover.Content
         size="1"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+        }}
         style={{
           width: 280,
           padding: 6,
           boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
         }}
-        onKeyDown={handleKeyDown}
       >
         {mode === "combobox" && (
           <Box mb="2" style={{ padding: "2px 2px" }}>
             <TextField.Root
+              ref={searchInputRef}
               size="1"
-              autoFocus
               placeholder="コード・名称で検索..."
               value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setHighlightedIndex(null);
+              }}
+              onKeyDown={handleSearchKeyDown}
             >
               <TextField.Slot>
                 <MagnifyingGlassIcon height={14} width={14} />
@@ -126,16 +211,19 @@ export const PulldownEditor: FC<Props> = ({
             </Box>
           ) : (
             filteredOptions.map((opt, index) => {
-              const isSelected = opt.key === value;
+              const isSelected = opt.key === inputValue;
               const isHighlighted = index === highlightedIndex;
 
               return (
                 <button
                   type="button"
                   key={opt.key}
+                  onMouseDown={(e) => {
+                    // Prevent blur before click fires
+                    e.preventDefault();
+                  }}
                   onClick={() => {
-                    onSelect(opt.key);
-                    onClose();
+                    commitValue(opt.key);
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   style={{

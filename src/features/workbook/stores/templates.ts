@@ -6,69 +6,44 @@ import {
   baseRowOrderAtom,
   sheetDataMapAtom,
   sheetFieldToColIdMapAtom,
-} from "../base";
-import { columnConfigsAtom, referencedSheetsDataAtom } from "../binding";
+} from "./base";
+import { columnConfigsAtom, referencedSheetsDataAtom } from "./binding";
 import {
   modifiedColumnNamesAtom,
   modifiedColumnOrdersAtom,
   modifiedRowOrdersAtom,
-} from "../edit";
-import { columnTotalsAtom } from "../summary";
-import type { SheetCategory, SheetTemplate } from "../types";
-import { activeSheetIdAtom } from "../ui";
-import { accountingUnitTemplate } from "./accountingUnit";
-import { costDepartmentTemplate } from "./costDepartment";
-import { officeTemplate } from "./office";
-import { productionVolumeTemplate } from "./productionVolume";
-import { productMasterTemplate } from "./productMaster";
-
-export {
-  productionVolumeTemplate,
-  accountingUnitTemplate,
-  officeTemplate,
-  costDepartmentTemplate,
-  productMasterTemplate,
-};
-
-export const DEFAULT_SHEET_CATEGORIES: SheetCategory[] = [
-  {
-    id: "planning",
-    name: "計画・実績",
-    description: "生産量や各種計画・実績データの管理",
-  },
-  {
-    id: "master",
-    name: "マスタ管理",
-    description: "会計単位、事業所、原価部門などの各種マスタデータ",
-  },
-];
-
-export const DEFAULT_SHEET_TEMPLATES: Record<string, SheetTemplate> = {
-  [productionVolumeTemplate.id]: productionVolumeTemplate,
-  [productMasterTemplate.id]: productMasterTemplate,
-  [accountingUnitTemplate.id]: accountingUnitTemplate,
-  [officeTemplate.id]: officeTemplate,
-  [costDepartmentTemplate.id]: costDepartmentTemplate,
-};
-
-export const INITIAL_OPEN_SHEET_IDS: string[] = [
-  productionVolumeTemplate.id,
-  productMasterTemplate.id,
-  accountingUnitTemplate.id,
-  officeTemplate.id,
-  costDepartmentTemplate.id,
-];
+} from "./edit";
+import { columnTotalsAtom } from "./summary";
+import type { SheetCategory, SheetTemplate } from "./types";
+import { activeSheetIdAtom } from "./ui";
+import { columnValidationsAtom } from "./validation";
 
 // --- 雛形管理 Atom 群（Template State Atoms） ---
 
 // 全カテゴリ
-export const sheetCategoriesAtom = atom<SheetCategory[]>(
-  DEFAULT_SHEET_CATEGORIES,
-);
+export const sheetCategoriesAtom = atom<SheetCategory[]>([]);
 
 // 全シート雛形カタログ
-export const sheetTemplatesAtom = atom<Record<string, SheetTemplate>>(
-  DEFAULT_SHEET_TEMPLATES,
+export const sheetTemplatesAtom = atom<Record<string, SheetTemplate>>({});
+
+// メタデータ一括初期化アクション
+export const initWorkbookMetadataAtom = atom(
+  null,
+  (
+    _get,
+    set,
+    payload: {
+      categories: SheetCategory[];
+      templates: Record<string, SheetTemplate>;
+      initialOpenSheetIds?: string[];
+    },
+  ) => {
+    set(sheetCategoriesAtom, payload.categories);
+    set(sheetTemplatesAtom, payload.templates);
+    if (payload.initialOpenSheetIds && payload.initialOpenSheetIds.length > 0) {
+      set(openSheetIdsAtom, payload.initialOpenSheetIds);
+    }
+  },
 );
 
 // 全シート雛形配列
@@ -106,7 +81,7 @@ export const sheetsByCategoryAtom = atom((get) => {
 });
 
 // 現在開いている（タブに表示されている）シートID配列
-export const openSheetIdsAtom = atom<string[]>(INITIAL_OPEN_SHEET_IDS);
+export const openSheetIdsAtom = atom<string[]>([]);
 
 // 現在アクティブなシートの雛形
 export const activeSheetTemplateAtom = atom<SheetTemplate | null>((get) => {
@@ -167,14 +142,56 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
     }
   }
 
-  // 3. メモリ解放（GC対象にするため、閉じたシートのAtomキーを削除）
-  const sheetDataMap = { ...get(sheetDataMapAtom) };
-  delete sheetDataMap[sheetId];
-  set(sheetDataMapAtom, sheetDataMap);
+  // 3. メモリ解放（他の開いているシートから参照されていない場合のみ解放）
+  const allConfigs = get(columnConfigsAtom);
+  const allTemplates = get(sheetTemplatesAtom);
+  const isReferenced = nextOpenIds.some((openId) => {
+    // 列設定での参照チェック
+    const configs = allConfigs[openId];
+    if (configs) {
+      for (const config of Object.values(configs)) {
+        if (
+          config.type === "pulldown" &&
+          config.pulldown.sourceSheetId === sheetId
+        ) {
+          return true;
+        }
+        if (
+          config.type === "lookup" &&
+          config.lookup.sourceSheetId === sheetId
+        ) {
+          return true;
+        }
+      }
+    }
+    // テンプレート定義での参照チェック
+    const template = allTemplates[openId];
+    if (template) {
+      for (const col of template.columns) {
+        if (
+          (col.type.type === "pulldown" || col.type.type === "lookup") &&
+          col.type.sourceTemplateId === sheetId
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
 
-  const fieldToColMap = { ...get(sheetFieldToColIdMapAtom) };
-  delete fieldToColMap[sheetId];
-  set(sheetFieldToColIdMapAtom, fieldToColMap);
+  if (!isReferenced) {
+    const referencedSheets = { ...get(referencedSheetsDataAtom) };
+    delete referencedSheets[sheetId];
+    set(referencedSheetsDataAtom, referencedSheets);
+
+    const sheetDataMap = { ...get(sheetDataMapAtom) };
+    delete sheetDataMap[sheetId];
+    set(sheetDataMapAtom, sheetDataMap);
+
+    const fieldToColMap = { ...get(sheetFieldToColIdMapAtom) };
+    delete fieldToColMap[sheetId];
+    set(sheetFieldToColIdMapAtom, fieldToColMap);
+  }
 
   const configs = { ...get(columnConfigsAtom) };
   delete configs[sheetId];
@@ -184,9 +201,9 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
   delete totals[sheetId];
   set(columnTotalsAtom, totals);
 
-  const referencedSheets = { ...get(referencedSheetsDataAtom) };
-  delete referencedSheets[sheetId];
-  set(referencedSheetsDataAtom, referencedSheets);
+  const validations = { ...get(columnValidationsAtom) };
+  delete validations[sheetId];
+  set(columnValidationsAtom, validations);
 
   // 4. 編集差分状態のクリーンアップ
   const modRowOrders = { ...get(modifiedRowOrdersAtom) };
@@ -205,9 +222,7 @@ export const closeSheetAtom = atom(null, (get, set, sheetId: string) => {
 export const toggleSheetAtom = atom(null, (get, set, sheetId: string) => {
   const currentOpenIds = get(openSheetIdsAtom);
   if (currentOpenIds.includes(sheetId)) {
-    if (currentOpenIds.length > 1) {
-      set(closeSheetAtom, sheetId);
-    }
+    set(closeSheetAtom, sheetId);
   } else {
     set(openSheetAtom, sheetId);
   }

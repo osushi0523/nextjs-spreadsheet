@@ -15,21 +15,23 @@ import {
   rowVersionsAtom,
   type ColumnConfig,
   type ColumnId,
+  type ColumnValidationRule,
   closeSheetAtom,
   columnConfigsAtom,
   columnTotalsAtom,
+  columnValidationsAtom,
   createColumnId,
   createRowId,
-  DEFAULT_SHEET_TEMPLATES,
-  INITIAL_OPEN_SHEET_IDS,
   openSheetAtom,
   openSheetIdsAtom,
   openSheetsAtom,
   referencedSheetsDataAtom,
   type SheetData,
+  type SheetTemplate,
   sheetDataMapAtom,
   sheetFieldToColIdMapAtom,
   sheetsByCategoryAtom,
+  sheetTemplatesAtom,
 } from "../stores";
 
 /**
@@ -37,6 +39,7 @@ import {
  */
 export const buildSheetData = (
   sheetId: string,
+  template: SheetTemplate,
   getFieldToColMap: (
     templateId: string,
   ) => Record<string, ColumnId> | undefined,
@@ -45,10 +48,8 @@ export const buildSheetData = (
   fieldToColId: Record<string, ColumnId>;
   configs: Record<ColumnId, ColumnConfig>;
   totals: Record<ColumnId, boolean>;
+  validations: Record<ColumnId, ColumnValidationRule[]>;
 } | null => {
-  const template = DEFAULT_SHEET_TEMPLATES[sheetId];
-  if (!template) return null;
-
   const columns = template.columns;
   const rawRecords = fetchMockSheetRecords(
     sheetId,
@@ -61,6 +62,7 @@ export const buildSheetData = (
   const fieldToColId: Record<string, ColumnId> = {};
   const configs: Record<ColumnId, ColumnConfig> = {};
   const totals: Record<ColumnId, boolean> = {};
+  const validations: Record<ColumnId, ColumnValidationRule[]> = {};
   const initialValues: Record<string, string> = {};
 
   // 1. 列情報の初期化
@@ -71,6 +73,10 @@ export const buildSheetData = (
 
     colNames[colId] = colDef.headerName;
     fieldToColId[colDef.field] = colId;
+
+    if (colDef.validations && colDef.validations.length > 0) {
+      validations[colId] = colDef.validations;
+    }
 
     if (colDef.hasTotal) {
       totals[colId] = true;
@@ -166,13 +172,22 @@ export const buildSheetData = (
     fieldToColId,
     configs,
     totals,
+    validations,
   };
 };
 
+/**
+ * 選択されたシートのデータ構築・状態管理およびキャッシュを行うフック
+ */
 export const useSheetLoader = () => {
   const [activeSheetId, setActiveSheetId] = useAtom(activeSheetIdAtom);
   const [sheetDataMap, setSheetDataMap] = useAtom(sheetDataMapAtom);
   const [fieldToColMap, setFieldToColMap] = useAtom(sheetFieldToColIdMapAtom);
+  const sheetTemplates = useAtomValue(sheetTemplatesAtom);
+  const openSheetIds = useAtomValue(openSheetIdsAtom);
+  const openSheets = useAtomValue(openSheetsAtom);
+  const sheetsByCategory = useAtomValue(sheetsByCategoryAtom);
+
   const setBaseRowOrder = useSetAtom(baseRowOrderAtom);
   const setBaseColumnOrder = useSetAtom(baseColumnOrderAtom);
   const setBaseColumnNames = useSetAtom(baseColumnNamesAtom);
@@ -180,8 +195,10 @@ export const useSheetLoader = () => {
   const setColumnConfigs = useSetAtom(columnConfigsAtom);
   const setRowVersions = useSetAtom(rowVersionsAtom);
   const setColumnTotals = useSetAtom(columnTotalsAtom);
+  const setColumnValidations = useSetAtom(columnValidationsAtom);
   const setReferencedSheets = useSetAtom(referencedSheetsDataAtom);
-  const openSheets = useAtomValue(openSheetsAtom);
+  const setOpenSheet = useSetAtom(openSheetAtom);
+  const setCloseSheet = useSetAtom(closeSheetAtom);
 
   const getOrInitSheetData = useCallback(
     (sheetId: string): SheetData | null => {
@@ -195,13 +212,17 @@ export const useSheetLoader = () => {
       const currentDataMap = { ...sheetDataMap };
       const newConfigs: Record<string, Record<ColumnId, ColumnConfig>> = {};
       const newTotals: Record<string, Record<ColumnId, boolean>> = {};
+      const newValidations: Record<
+        string,
+        Record<ColumnId, ColumnValidationRule[]>
+      > = {};
 
       const resolveSheet = (targetId: string): SheetData | null => {
         if (currentDataMap[targetId]) {
           return currentDataMap[targetId];
         }
 
-        const template = DEFAULT_SHEET_TEMPLATES[targetId];
+        const template = sheetTemplates[targetId];
         if (!template) return null;
 
         // 依存先マスタを先に再帰解決
@@ -214,13 +235,18 @@ export const useSheetLoader = () => {
           }
         }
 
-        const built = buildSheetData(targetId, (id) => currentFieldMap[id]);
+        const built = buildSheetData(
+          targetId,
+          template,
+          (id) => currentFieldMap[id],
+        );
         if (!built) return null;
 
         currentDataMap[targetId] = built.data;
         currentFieldMap[targetId] = built.fieldToColId;
         newConfigs[targetId] = built.configs;
         newTotals[targetId] = built.totals;
+        newValidations[targetId] = built.validations;
 
         return built.data;
       };
@@ -233,6 +259,7 @@ export const useSheetLoader = () => {
       setFieldToColMap((prev) => ({ ...prev, ...currentFieldMap }));
       setColumnConfigs((prev) => ({ ...prev, ...newConfigs }));
       setColumnTotals((prev) => ({ ...prev, ...newTotals }));
+      setColumnValidations((prev) => ({ ...prev, ...newValidations }));
       setReferencedSheets((prev) => ({ ...prev, ...currentDataMap }));
 
       return result;
@@ -240,10 +267,12 @@ export const useSheetLoader = () => {
     [
       sheetDataMap,
       fieldToColMap,
+      sheetTemplates,
       setSheetDataMap,
       setFieldToColMap,
       setColumnConfigs,
       setColumnTotals,
+      setColumnValidations,
       setReferencedSheets,
     ],
   );
@@ -293,16 +322,15 @@ export const useSheetLoader = () => {
     ],
   );
 
+  // 初期アクティブシートの自動ロード
   useEffect(() => {
-    if (!activeSheetId) {
-      loadSheetData(INITIAL_OPEN_SHEET_IDS[0]);
+    if (!activeSheetId && openSheetIds.length > 0) {
+      const initialSheetId = openSheetIds[0];
+      if (initialSheetId && sheetTemplates[initialSheetId]) {
+        loadSheetData(initialSheetId);
+      }
     }
-  }, [activeSheetId, loadSheetData]);
-
-  const setOpenSheet = useSetAtom(openSheetAtom);
-  const setCloseSheet = useSetAtom(closeSheetAtom);
-  const openSheetIds = useAtomValue(openSheetIdsAtom);
-  const sheetsByCategory = useAtomValue(sheetsByCategoryAtom);
+  }, [activeSheetId, openSheetIds, sheetTemplates, loadSheetData]);
 
   const handleSelectSheet = useCallback(
     (id: string) => {
@@ -333,9 +361,7 @@ export const useSheetLoader = () => {
     [activeSheetId, openSheetIds, loadSheetData, setCloseSheet],
   );
 
-  const activeSheet = activeSheetId
-    ? DEFAULT_SHEET_TEMPLATES[activeSheetId]
-    : undefined;
+  const activeSheet = activeSheetId ? sheetTemplates[activeSheetId] : undefined;
 
   return {
     activeSheet,

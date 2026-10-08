@@ -10,7 +10,7 @@
   }
 
   &.edited {
-    background-color: var(--blue-9);
+    background-color: var(--amber-9);
   }
 
   &.deleted {
