@@ -12,6 +12,9 @@ import { useProductSheetSave } from "../containers/useProductSheetSave";
 import { localMessages } from "./i18n";
 import styles from "./Toolbar.module.css";
 
+import { useAtomValue } from "jotai";
+import { activeSheetIdAtom } from "../stores";
+
 type ToolbarProps = {
   sheetName?: string;
   onExport: () => void | Promise<void>;
@@ -30,6 +33,7 @@ export const Toolbar: FC<ToolbarProps> = ({
   isExportingPdf,
 }) => {
   const { t } = useI18n(localMessages);
+  const activeSheetId = useAtomValue(activeSheetIdAtom);
   const { handleSaveClick, isSaving } = useProductSheetSave();
   const { locale, setLocale, isPending } = useCurrentLocale();
 
@@ -86,16 +90,18 @@ export const Toolbar: FC<ToolbarProps> = ({
           ? t("generatingPdf", { sheetName: displayName })
           : t("printPreview", { sheetName: displayName })}
       </Button>
-      <Button
-        type="button"
-        onClick={handleSaveClick}
-        disabled={isSaving}
-        loading={isSaving}
-        color="blue"
-        variant="solid"
-      >
-        保存
-      </Button>
+      {activeSheetId === "product-master" && (
+        <Button
+          type="button"
+          onClick={handleSaveClick}
+          disabled={isSaving}
+          loading={isSaving}
+          color="blue"
+          variant="solid"
+        >
+          保存
+        </Button>
+      )}
       <TextField.Root placeholder={t("search")}></TextField.Root>
       <Select.Root
         value={locale}

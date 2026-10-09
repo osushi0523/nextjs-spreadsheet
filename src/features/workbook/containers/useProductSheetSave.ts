@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 
@@ -8,6 +7,7 @@ import {
   type ProductRow,
 } from "../adapters/productSheetAdapter";
 import {
+  activeSheetIdAtom,
   baseCellValuesAtom,
   baseRowOrderAtom,
   cellEditsAtom,
@@ -23,6 +23,7 @@ import {
 export function useProductSheetSave() {
   const [isSaving, setIsSaving] = useState(false);
 
+  const activeSheetId = useAtomValue(activeSheetIdAtom);
   const baseValues = useAtomValue(baseCellValuesAtom);
   const cellEdits = useAtomValue(cellEditsAtom);
   const rowOrder = useAtomValue(rowOrderAtom);
@@ -53,6 +54,10 @@ export function useProductSheetSave() {
   };
 
   const handleSaveClick = async () => {
+    if (activeSheetId !== "product-master") {
+      return;
+    }
+
     setIsSaving(true);
 
     try {

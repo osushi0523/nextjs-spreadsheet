@@ -33,7 +33,7 @@ export function toProductSheet(rows: ProductRow[]): SheetData {
   });
 
   return {
-    id: "sheet-2",
+    id: "product-master",
     name: "商品マスター",
     rows: rowIds,
     cols,
