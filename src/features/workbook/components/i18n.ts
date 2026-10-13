@@ -9,6 +9,15 @@ export const localMessages = {
     sheetMenu: "シート一覧",
     noOpenSheets: "開いているシートがありません",
     openSheetMenu: "シートメニューを開く",
+    save: "保存",
+    saving: "保存中...",
+    validationErrorTitle: "入力内容をご確認ください",
+    validationErrorMessage:
+      "バリデーションエラーが発生しているセルがあります。該当箇所をご確認ください。",
+    saveSuccessTitle: "保存完了",
+    saveSuccessMessage: "シートの変更内容を保存しました。",
+    saveErrorTitle: "保存失敗",
+    saveErrorMessage: "シートの保存中にエラーが発生しました。",
   },
   en: {
     exportExcel: "Export to Excel",
@@ -20,5 +29,14 @@ export const localMessages = {
     sheetMenu: "Sheets",
     noOpenSheets: "No sheets are currently open",
     openSheetMenu: "Open sheet menu",
+    save: "Save",
+    saving: "Saving...",
+    validationErrorTitle: "Validation Error",
+    validationErrorMessage:
+      "Some cells have validation errors. Please check the highlighted cells.",
+    saveSuccessTitle: "Saved Successfully",
+    saveSuccessMessage: "Sheet changes have been saved.",
+    saveErrorTitle: "Save Failed",
+    saveErrorMessage: "An error occurred while saving the sheet.",
   },
 } as const;
