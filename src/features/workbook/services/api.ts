@@ -1,4 +1,3 @@
-import type { ColumnId, RowId, RowStatus } from "../stores/types";
 import {
   PRODUCT_COLUMNS,
   type ProductRow,
@@ -110,6 +109,13 @@ export const saveSheetApi = async (
       version,
     };
   });
+
+  if (creates.length === 0 && updates.length === 0 && deletes.length === 0) {
+    return {
+      success: true,
+      rowVersions,
+    };
+  }
 
   const response = await fetch("/api/backend/api/spreadsheet/rows/batch", {
     method: "PUT",
