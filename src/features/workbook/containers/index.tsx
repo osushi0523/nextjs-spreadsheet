@@ -290,7 +290,11 @@ export const WorkbookContainer: FC = () => {
               hasActiveSheet={Boolean(activeSheetId)}
               onExport={exportCurrentSheet}
               onPreviewPdf={previewCurrentSheetPdf}
-              onSave={handleSave}
+              onSave={
+                activeSheetId === "product-master"
+                  ? handleSave
+                  : undefined
+              }
               onOpenMenu={() => setIsDrawerOpen(true)}
               isExportingExcel={isExportingExcel}
               isExportingPdf={isExportingPdf}

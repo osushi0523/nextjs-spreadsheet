@@ -9,12 +9,8 @@ import { type FC, useCallback } from "react";
 import { useCurrentLocale } from "@/i18n/context";
 import { useI18n } from "@/i18n/useI18n";
 import { isLocale } from "@/i18n/utils";
-import { useProductSheetSave } from "../containers/useProductSheetSave";
 import { localMessages } from "./i18n";
 import styles from "./Toolbar.module.css";
-
-import { useAtomValue } from "jotai";
-import { activeSheetIdAtom } from "../stores";
 
 type ToolbarProps = {
   sheetName?: string;
@@ -40,8 +36,6 @@ export const Toolbar: FC<ToolbarProps> = ({
   isSaving,
 }) => {
   const { t } = useI18n(localMessages);
-  const activeSheetId = useAtomValue(activeSheetIdAtom);
-  const { handleSaveClick, isSaving } = useProductSheetSave();
   const { locale, setLocale, isPending } = useCurrentLocale();
 
   const handleChangeLocale = useCallback(
@@ -97,18 +91,6 @@ export const Toolbar: FC<ToolbarProps> = ({
           ? t("generatingPdf", { sheetName: displayName })
           : t("printPreview", { sheetName: displayName })}
       </Button>
-      {activeSheetId === "product-master" && (
-        <Button
-          type="button"
-          onClick={handleSaveClick}
-          disabled={isSaving}
-          loading={isSaving}
-          color="blue"
-          variant="solid"
-        >
-          保存
-        </Button>
-      )}
       <TextField.Root placeholder={t("search")}></TextField.Root>
       <Flex align="center" gap="2" style={{ marginLeft: "auto" }}>
         <Select.Root

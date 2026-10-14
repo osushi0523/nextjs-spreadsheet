@@ -14,6 +14,7 @@ import {
   rowStatusesAtom,
   sheetTemplatesAtom,
   visibleRowOrderAtom,
+  rowVersionsAtom,
 } from "../stores";
 import {
   type FirstValidationError,
@@ -49,6 +50,8 @@ export const useSaveSheet = ({
     const customStatuses = store.get(cellCustomStatusesAtom);
     const templates = store.get(sheetTemplatesAtom);
     const sheetTemplate = templates[activeSheetId];
+
+    const rowVersions = store.get(rowVersionsAtom);
 
     // 1. バリデーションチェック (上から順に走査)
     const firstError: FirstValidationError | null = findFirstValidationError({
@@ -88,12 +91,21 @@ export const useSaveSheet = ({
           columns,
           values: { ...baseValues, ...cellEdits },
         },
+        metadata: {
+          rowVersions,
+        },
       };
 
-      await saveSheetApi(payload);
+      const result = await saveSheetApi(payload);
 
+      // upstreamの標準処理
       // 案A: 保存成功時にステートを確定・コミット
       store.set(commitSheetEditsAtom);
+
+      // Spring Boot用のversionだけ更新
+      if (result.rowVersions) {
+        store.set(rowVersionsAtom, result.rowVersions);
+      }
 
       onSuccess?.();
       return true;
