@@ -1,4 +1,5 @@
 import {
+  CheckIcon,
   DownloadIcon,
   FileTextIcon,
   HamburgerMenuIcon,
@@ -17,20 +18,26 @@ import { activeSheetIdAtom } from "../stores";
 
 type ToolbarProps = {
   sheetName?: string;
+  hasActiveSheet?: boolean;
   onExport: () => void | Promise<void>;
   onPreviewPdf: () => void | Promise<void>;
+  onSave?: () => void | Promise<void>;
   onOpenMenu?: () => void;
   isExportingExcel?: boolean;
   isExportingPdf?: boolean;
+  isSaving?: boolean;
 };
 
 export const Toolbar: FC<ToolbarProps> = ({
   sheetName,
+  hasActiveSheet,
   onExport,
   onPreviewPdf,
+  onSave,
   onOpenMenu,
   isExportingExcel,
   isExportingPdf,
+  isSaving,
 }) => {
   const { t } = useI18n(localMessages);
   const activeSheetId = useAtomValue(activeSheetIdAtom);
@@ -103,17 +110,30 @@ export const Toolbar: FC<ToolbarProps> = ({
         </Button>
       )}
       <TextField.Root placeholder={t("search")}></TextField.Root>
-      <Select.Root
-        value={locale}
-        disabled={isPending}
-        onValueChange={handleChangeLocale}
-      >
-        <Select.Trigger style={{ marginLeft: "auto", cursor: "pointer" }} />
-        <Select.Content>
-          <Select.Item value="ja">日本語</Select.Item>
-          <Select.Item value="en">English</Select.Item>
-        </Select.Content>
-      </Select.Root>
+      <Flex align="center" gap="2" style={{ marginLeft: "auto" }}>
+        <Select.Root
+          value={locale}
+          disabled={isPending}
+          onValueChange={handleChangeLocale}
+        >
+          <Select.Trigger style={{ cursor: "pointer" }} />
+          <Select.Content>
+            <Select.Item value="ja">日本語</Select.Item>
+            <Select.Item value="en">English</Select.Item>
+          </Select.Content>
+        </Select.Root>
+        {onSave && (
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving || !hasActiveSheet}
+            variant="solid"
+          >
+            <CheckIcon />
+            {t("save")}
+          </Button>
+        )}
+      </Flex>
     </Flex>
   );
 };
