@@ -6,6 +6,7 @@ export type WorkbookPresenterProps = {
   filterBar?: ReactNode;
   tabs: ReactNode;
   sheet: ReactNode;
+  statusBar?: ReactNode;
 };
 
 export const WorkbookPresenter: FC<WorkbookPresenterProps> = ({
@@ -13,6 +14,7 @@ export const WorkbookPresenter: FC<WorkbookPresenterProps> = ({
   filterBar,
   tabs,
   sheet,
+  statusBar,
 }) => {
   return (
     <Flex direction="column" width="100vw" height="100vh" overflow="hidden">
@@ -22,6 +24,7 @@ export const WorkbookPresenter: FC<WorkbookPresenterProps> = ({
       <Box flexGrow="1" overflow="hidden">
         {sheet}
       </Box>
+      {statusBar}
     </Flex>
   );
 };

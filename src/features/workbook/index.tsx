@@ -27,6 +27,8 @@ import { SheetPresenter } from "./Sheet/Sheet.presenter";
 import { SheetMenuDrawerPresenter } from "./SheetMenuDrawer/SheetMenuDrawer.presenter";
 import { useSheetMenuDrawer } from "./SheetMenuDrawer/useSheetMenuDrawer.container";
 import { SheetTabsPresenter } from "./SheetTabs.presenter";
+import { StatusBarPresenter } from "./StatusBar/StatusBar.presenter";
+import { useStatusBar } from "./StatusBar/useStatusBar.container";
 import {
   clearColumnFilterAtom,
   injectedCustomValidatorsAtom,
@@ -137,6 +139,7 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
   });
 
   const searchFilterBarProps = useSearchFilterBar();
+  const statusBarProps = useStatusBar();
 
   const drawerProps = useSheetMenuDrawer({
     open: isDrawerOpen,
@@ -245,6 +248,9 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
           ) : (
             <EmptySheetPresenter onOpenMenu={() => setIsDrawerOpen(true)} />
           )
+        }
+        statusBar={
+          statusBarProps ? <StatusBarPresenter {...statusBarProps} /> : null
         }
       />
       <SheetMenuDrawerPresenter {...drawerProps} />
