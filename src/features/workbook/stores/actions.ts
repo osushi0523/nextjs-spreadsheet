@@ -1,4 +1,4 @@
-import { atom } from "jotai";
+import { atom, type Getter } from "jotai";
 import { baseCellValuesAtom } from "./base";
 import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
 import { columnNamesAtom, columnOrderAtom, rowOrderAtom } from "./derived";
@@ -7,11 +7,13 @@ import {
   cellEditsAtom,
   modifiedRowOrdersAtom,
   rowStatusesAtom,
+  touchedCellsAtom,
 } from "./edit";
-import { visibleRowOrderAtom } from "./filter";
+import { activeColumnFiltersAtom, visibleRowOrderAtom } from "./filter";
 import {
   type CellAddress,
   type CellStatusInfo,
+  type ColumnConfig,
   type ColumnId,
   createColumnId,
   createRowId,
@@ -37,10 +39,68 @@ export const resetRowStatusesAtom = atom(null, (get, set) => {
   set(rowStatusesAtom, currentStatuses);
 });
 
+/**
+ * フィルター選択肢と基準行の値から、新規セルに補完する値を決定する純粋関数
+ */
+const pickPrefillValue = (
+  selectedValues: string[],
+  sourceValue?: string,
+): string | undefined => {
+  if (sourceValue && selectedValues.includes(sourceValue)) {
+    return sourceValue;
+  }
+  return selectedValues.find((val) => val !== "") ?? selectedValues[0];
+};
+
+/**
+ * 列が穴埋め入力の対象かを判定するガード
+ */
+const isPrefillableColumn = (config?: ColumnConfig): boolean =>
+  config?.type !== "lookup" && !config?.readOnly;
+
+/**
+ * 新規行に対してアクティブなフィルター条件から穴埋めする編集差分を生成
+ */
+const resolvePrefillValuesForNewRow = (
+  get: Getter,
+  newRowId: RowId,
+  sourceRowId?: RowId,
+): Record<string, string> => {
+  const filters = get(activeColumnFiltersAtom);
+  const configs = get(activeColumnConfigsAtom);
+  const edits = get(cellEditsAtom);
+  const baseValues = get(baseCellValuesAtom);
+
+  const prefillEdits: Record<string, string> = {};
+
+  for (const [colId, filter] of Object.entries(filters)) {
+    if (!isPrefillableColumn(configs[colId as ColumnId])) continue;
+    if (!filter?.selectedValues?.length) continue;
+
+    const sourceKey = sourceRowId ? `${sourceRowId}-${colId}` : undefined;
+    const sourceValue = sourceKey
+      ? (edits[sourceKey] ?? baseValues[sourceKey])
+      : undefined;
+
+    const fillValue = pickPrefillValue(filter.selectedValues, sourceValue);
+    if (fillValue) {
+      prefillEdits[`${newRowId}-${colId}`] = fillValue;
+    }
+  }
+
+  return prefillEdits;
+};
+
 export const addRowAtom = atom(null, (get, set) => {
   const newId = createRowId();
   const rowOrder = get(rowOrderAtom);
+  const prefillEdits = resolvePrefillValuesForNewRow(get, newId);
+
   set(rowOrderAtom, [...rowOrder, newId]);
+  set(cellEditsAtom, {
+    ...get(cellEditsAtom),
+    ...prefillEdits,
+  });
   set(rowStatusesAtom, {
     ...get(rowStatusesAtom),
     [newId]: "added",
@@ -63,7 +123,13 @@ export const insertRowAtom = atom(
     const insertIndex = position === "above" ? rowIndex : rowIndex + 1;
     newRowOrder.splice(insertIndex, 0, newId);
 
+    const prefillEdits = resolvePrefillValuesForNewRow(get, newId, rowId);
+
     set(rowOrderAtom, newRowOrder);
+    set(cellEditsAtom, {
+      ...get(cellEditsAtom),
+      ...prefillEdits,
+    });
     set(rowStatusesAtom, {
       ...get(rowStatusesAtom),
       [newId]: "added",
@@ -402,6 +468,7 @@ export const commitSheetEditsAtom = atom(null, (get, set) => {
   set(rowStatusesAtom, {});
   set(cellCustomStatusesAtom, {});
   set(asyncValidationErrorsAtom, {});
+  set(touchedCellsAtom, new Set());
 });
 
 export const moveSelectionAtom = atom(

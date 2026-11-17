@@ -36,6 +36,7 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
 }) => {
   const { t } = useI18n(localMessages);
   const [inputValue, setInputValue] = useState(initialValue);
+  const inputValueRef = useRef(initialValue);
   const [search, setSearch] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const isFinishedRef = useRef(false);
@@ -88,6 +89,7 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
 
   const handleCellChange = (e: ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    inputValueRef.current = e.target.value;
   };
 
   const handleCellBlur = (e: FocusEvent<HTMLInputElement>) => {
@@ -123,8 +125,10 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
         filteredOptions[highlightedIndex] !== undefined
       ) {
         commitValue(filteredOptions[highlightedIndex].key, move);
+      } else if (filteredOptions.length > 0) {
+        commitValue(filteredOptions[0].key, move);
       } else {
-        commitValue(inputValue, move);
+        commitValue(inputValueRef.current, move);
       }
     } else if (e.key === "Tab") {
       e.preventDefault();
@@ -137,8 +141,10 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
         filteredOptions[highlightedIndex] !== undefined
       ) {
         commitValue(filteredOptions[highlightedIndex].key, move);
+      } else if (filteredOptions.length > 0) {
+        commitValue(filteredOptions[0].key, move);
       } else {
-        commitValue(inputValue, move);
+        commitValue(inputValueRef.current, move);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -157,30 +163,35 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
       moveHighlight(-1);
     } else if (e.key === "Enter") {
       e.preventDefault();
+      const move: MoveDirection = {
+        deltaRow: e.shiftKey ? -1 : 1,
+        deltaCol: 0,
+      };
       if (
         highlightedIndex !== null &&
         filteredOptions[highlightedIndex] !== undefined
       ) {
-        commitValue(filteredOptions[highlightedIndex].key, {
-          deltaRow: e.shiftKey ? -1 : 1,
-          deltaCol: 0,
-        });
+        commitValue(filteredOptions[highlightedIndex].key, move);
+      } else if (filteredOptions.length > 0) {
+        commitValue(filteredOptions[0].key, move);
+      } else {
+        commitValue(inputValueRef.current, move);
       }
     } else if (e.key === "Tab") {
       e.preventDefault();
+      const move: MoveDirection = {
+        deltaRow: 0,
+        deltaCol: e.shiftKey ? -1 : 1,
+      };
       if (
         highlightedIndex !== null &&
         filteredOptions[highlightedIndex] !== undefined
       ) {
-        commitValue(filteredOptions[highlightedIndex].key, {
-          deltaRow: 0,
-          deltaCol: e.shiftKey ? -1 : 1,
-        });
+        commitValue(filteredOptions[highlightedIndex].key, move);
+      } else if (filteredOptions.length > 0) {
+        commitValue(filteredOptions[0].key, move);
       } else {
-        commitValue(inputValue, {
-          deltaRow: 0,
-          deltaCol: e.shiftKey ? -1 : 1,
-        });
+        commitValue(inputValueRef.current, move);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -193,7 +204,7 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
       open={true}
       onOpenChange={(open) => {
         if (!open) {
-          commitValue(inputValue);
+          commitValue(inputValueRef.current);
         }
       }}
     >
@@ -274,6 +285,7 @@ export const PulldownEditorPresenter: FC<PulldownEditorPresenterProps> = ({
                   onMouseDown={(e) => {
                     // Prevent blur before click fires
                     e.preventDefault();
+                    commitValue(opt.key);
                   }}
                   onClick={() => {
                     commitValue(opt.key);

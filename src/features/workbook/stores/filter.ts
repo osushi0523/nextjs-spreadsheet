@@ -3,7 +3,7 @@ import { atomFamily } from "jotai-family";
 import { baseCellValuesAtom } from "./base";
 import { activeColumnConfigsAtom, getLookupValue } from "./binding";
 import { columnOrderAtom, rowOrderAtom } from "./derived";
-import { cellEditsAtom } from "./edit";
+import { cellEditsAtom, rowStatusesAtom } from "./edit";
 import type { ColumnFilter, ColumnId, RowId } from "./types";
 import { activeSheetIdAtom } from "./ui";
 
@@ -112,28 +112,26 @@ export const visibleRowOrderAtom = atom<RowId[]>((get) => {
   const edits = get(cellEditsAtom);
   const baseValues = get(baseCellValuesAtom);
   const configs = get(activeColumnConfigsAtom);
+  const rowStatuses = get(rowStatusesAtom);
 
   return rowOrder.filter((rowId) => {
-    for (const [colId, filter] of activeColFilterEntries) {
-      let cellValue = "";
-      const config = configs[colId];
-      if (config && config.type === "lookup") {
-        cellValue = getLookupValue(
-          get,
-          { rowId, colId },
-          config.lookup,
-          baseValues,
-        );
-      } else {
-        const key = `${rowId}-${colId}`;
-        cellValue = key in edits ? edits[key] : (baseValues[key] ?? "");
-      }
-
-      if (!filter.selectedValues.includes(cellValue)) {
-        return false;
-      }
+    // 編集中の行（新規追加・変更行）は作業中のため無条件に表示
+    const status = rowStatuses[rowId];
+    if (status === "added" || status === "edited") {
+      return true;
     }
-    return true;
+
+    return activeColFilterEntries.every(([colId, filter]) => {
+      const config = configs[colId];
+      const cellValue =
+        config && config.type === "lookup"
+          ? getLookupValue(get, { rowId, colId }, config.lookup, baseValues)
+          : (edits[`${rowId}-${colId}`] ??
+            baseValues[`${rowId}-${colId}`] ??
+            "");
+
+      return filter.selectedValues.includes(cellValue);
+    });
   });
 });
 

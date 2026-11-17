@@ -23,6 +23,7 @@ import {
   modifiedColumnOrdersAtom,
   modifiedRowOrdersAtom,
   rowStatusesAtom,
+  touchedCellsAtom,
 } from "./edit";
 import { subtotalCellValueFamily } from "./inquiry";
 import {
@@ -340,6 +341,18 @@ export const cellStatusFamily = atomFamily(
         const edits = get(cellEditsAtom);
         const baseValue = get(baseCellValuesAtom)[key] ?? "";
         const cellValue = key in edits ? edits[key] : baseValue;
+
+        // 新規追加行で、一度も blur（フォーカス離脱）または編集されておらず空のセルは初期バリデーションエラー表示を抑制
+        const rowStatuses = get(rowStatusesAtom);
+        const touchedCells = get(touchedCellsAtom);
+        if (
+          rowStatuses[address.rowId] === "added" &&
+          !touchedCells.has(key) &&
+          !(key in edits) &&
+          !cellValue
+        ) {
+          return { status: "none" };
+        }
 
         // 4. 列のバリデーションルールを順次検証
         const validations = get(activeColumnValidationsAtom)[address.colId];

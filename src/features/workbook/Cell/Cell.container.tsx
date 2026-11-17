@@ -5,7 +5,9 @@ import {
   memo,
   type ReactNode,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
 } from "react";
 import { useAsyncCellValidation } from "../logics/useAsyncCellValidation";
 import {
@@ -27,6 +29,7 @@ import {
   type RowId,
   referencedSheetsDataAtom,
   selectionAtom,
+  touchCellAtom,
   visibleRowOrderAtom,
   workbookStatusAtom,
 } from "../stores";
@@ -136,6 +139,18 @@ const CellInner: FC<InnerProps> = memo(
     const moveSelection = useSetAtom(moveSelectionAtom);
     const setWorkbookStatus = useSetAtom(workbookStatusAtom);
     const setSelection = useSetAtom(selectionAtom);
+    const touchCell = useSetAtom(touchCellAtom);
+    const cellKey = `${rowId}-${colId}` as const;
+
+    const wasEditingRef = useRef(false);
+    useEffect(() => {
+      if (isEditing) {
+        wasEditingRef.current = true;
+      } else if (wasEditingRef.current) {
+        wasEditingRef.current = false;
+        touchCell(cellKey);
+      }
+    }, [isEditing, touchCell, cellKey]);
 
     const config = useAtomValue(
       useMemo(() => activeColumnConfigFamily(colId), [colId]),
@@ -160,6 +175,7 @@ const CellInner: FC<InnerProps> = memo(
 
     const handleCommit = useCallback(
       (newVal: string, move?: MoveDirection) => {
+        touchCell(cellKey);
         if (newVal !== value) {
           setValue(newVal);
           validateCellAsync({ rowId, colId, newValue: newVal });
@@ -173,6 +189,8 @@ const CellInner: FC<InnerProps> = memo(
         }
       },
       [
+        touchCell,
+        cellKey,
         value,
         setValue,
         setEditingCell,
@@ -185,11 +203,12 @@ const CellInner: FC<InnerProps> = memo(
     );
 
     const handleCancel = useCallback(() => {
+      touchCell(cellKey);
       setEditingCell(null);
       queueMicrotask(() => {
         onFinishEditing?.();
       });
-    }, [setEditingCell, onFinishEditing]);
+    }, [touchCell, cellKey, setEditingCell, onFinishEditing]);
 
     const handleSelectionStart = useCallback(
       (event: MouseEvent<HTMLButtonElement>) => {
