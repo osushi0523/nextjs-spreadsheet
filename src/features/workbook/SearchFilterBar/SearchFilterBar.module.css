@@ -94,7 +94,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 16px;
-  max-height: 148px;
+  max-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
