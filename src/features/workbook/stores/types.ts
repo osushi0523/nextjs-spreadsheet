@@ -198,6 +198,13 @@ export type ColumnTemplate = {
   align?: "left" | "center" | "right";
 };
 
+export type SheetFilterDefinition = {
+  field: string;
+  label?: string;
+  required?: boolean;
+  selectionType: "single" | "multiple";
+};
+
 export type SheetCategory = {
   id: string;
   name: string;
@@ -229,9 +236,17 @@ export type SheetTemplate = {
   columns: ColumnTemplate[];
   defaultRowCount?: number;
   subtotalConfig?: SubtotalConfig;
+  filters?: SheetFilterDefinition[];
 };
 
 // --- Raw Types (API レスポンスに含まれる多言語生データ型) ---
+
+export type SheetFilterDefinitionRaw = {
+  field: string;
+  label?: I18nString;
+  required?: boolean;
+  selectionType: "single" | "multiple";
+};
 
 export type ColumnTemplateTypeRaw =
   | { type: "text" }
@@ -290,4 +305,5 @@ export type SheetTemplateRaw = {
   columns: ColumnTemplateRaw[];
   defaultRowCount?: number;
   subtotalConfig?: SubtotalConfigRaw;
+  filters?: SheetFilterDefinitionRaw[];
 };

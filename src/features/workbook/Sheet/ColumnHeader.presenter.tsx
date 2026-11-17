@@ -15,6 +15,7 @@ export type ColumnHeaderPresenterProps = {
   colId: ColumnId | null;
   config?: ColumnConfig;
   isFiltered: boolean;
+  isFilterable?: boolean;
   hasTotal: boolean;
   setNodeRef: (node: HTMLElement | null) => void;
   dndStyle: {
@@ -38,6 +39,7 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
   colId,
   config,
   isFiltered,
+  isFilterable = true,
   hasTotal,
   setNodeRef,
   dndStyle,
@@ -100,7 +102,7 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
           </Badge>
         )}
 
-        {isFiltered && (
+        {isFiltered && isFilterable && (
           <IconButton
             size="1"
             variant="soft"
@@ -124,7 +126,9 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
               <IconButton
                 size="1"
                 variant="ghost"
-                color={isFiltered || hasTotal ? "blue" : "gray"}
+                color={
+                  (isFiltered && isFilterable) || hasTotal ? "blue" : "gray"
+                }
                 aria-label={t("columnMenuAria")}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -141,7 +145,7 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
               </DropdownMenu.Item>
               <DropdownMenu.Separator />
 
-              {!isLookup && (
+              {!isLookup && isFilterable && (
                 <>
                   <DropdownMenu.Item
                     onSelect={() => colId && onOpenFilterModal?.(colId)}

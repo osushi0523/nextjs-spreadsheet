@@ -6,7 +6,9 @@ import {
   activeColumnConfigsAtom,
   activeColumnFiltersAtom,
   activeColumnTotalsAtom,
+  activeSheetIdAtom,
   isColumnId,
+  sheetTemplatesAtom,
 } from "../stores";
 import type { ColumnHeaderPresenterProps } from "./ColumnHeader.presenter";
 import type { AxisLayout } from "./Sheet.presenter";
@@ -30,9 +32,16 @@ export const ColumnHeaderContainer: FC<Props> = ({
   const configs = useAtomValue(activeColumnConfigsAtom);
   const filters = useAtomValue(activeColumnFiltersAtom);
   const totals = useAtomValue(activeColumnTotalsAtom);
+  const activeSheetId = useAtomValue(activeSheetIdAtom);
+  const templates = useAtomValue(sheetTemplatesAtom);
   const colId = isColumnId(col.id) ? col.id : null;
   const config = colId ? configs[colId] : undefined;
   const isLookup = config?.type === "lookup";
+
+  const template = activeSheetId ? templates[activeSheetId] : undefined;
+  const isFilterable = template?.filters
+    ? template.filters.some((f) => f.field === colId)
+    : true;
 
   const isFiltered = Boolean(colId && filters[colId]);
   const hasTotal = Boolean(colId && totals[colId]);
@@ -63,6 +72,7 @@ export const ColumnHeaderContainer: FC<Props> = ({
         colId,
         config,
         isFiltered,
+        isFilterable,
         hasTotal,
         setNodeRef: isLookup ? () => {} : setNodeRef,
         dndStyle: isLookup ? {} : dndStyle,

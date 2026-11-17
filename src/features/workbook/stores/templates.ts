@@ -59,6 +59,12 @@ export const localizeSheetTemplate = (
           : undefined,
       }
     : undefined,
+  filters: template.filters
+    ? template.filters.map((f) => ({
+        ...f,
+        label: f.label ? resolveI18nString(f.label, locale) : undefined,
+      }))
+    : undefined,
 });
 
 // 全カテゴリ（workbookMetadataQuery から導出、現在ロケールでローカライズ解決）

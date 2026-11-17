@@ -5,6 +5,7 @@ import {
   Checkbox,
   Dialog,
   Flex,
+  RadioGroup,
   ScrollArea,
   Text,
   TextField,
@@ -36,6 +37,8 @@ export type ColumnFilterModalPresenterProps = {
   onClearFilter: () => void;
   onCancel: () => void;
   isFilterActive: boolean;
+  isSingleSelect?: boolean;
+  isRequired?: boolean;
 };
 
 export type ColumnFilterModalProps = {
@@ -61,6 +64,8 @@ export const ColumnFilterModalPresenter: FC<
   onClearFilter,
   onCancel,
   isFilterActive,
+  isSingleSelect = false,
+  isRequired = false,
 }) => {
   const { t } = useI18n(filterModalMessages);
 
@@ -99,30 +104,38 @@ export const ColumnFilterModalPresenter: FC<
 
           <Flex justify="between" align="center">
             <Text size="1" color="gray">
-              {t("selectedCount", {
-                selected: selectedValues.length,
-                total: options.length,
-              })}
+              {isSingleSelect
+                ? selectedValues.length > 0
+                  ? t("selectedCount", { selected: 1, total: options.length })
+                  : t("deselectAll")
+                : t("selectedCount", {
+                    selected: selectedValues.length,
+                    total: options.length,
+                  })}
             </Text>
             <Flex gap="2">
-              <Button
-                type="button"
-                size="1"
-                variant="ghost"
-                onClick={onSelectAll}
-                disabled={allFilteredSelected}
-              >
-                {t("selectAll")}
-              </Button>
-              <Button
-                type="button"
-                size="1"
-                variant="ghost"
-                onClick={onDeselectAll}
-                disabled={selectedValues.length === 0}
-              >
-                {t("deselectAll")}
-              </Button>
+              {!isSingleSelect && (
+                <Button
+                  type="button"
+                  size="1"
+                  variant="ghost"
+                  onClick={onSelectAll}
+                  disabled={allFilteredSelected}
+                >
+                  {t("selectAll")}
+                </Button>
+              )}
+              {(!isSingleSelect || !isRequired) && (
+                <Button
+                  type="button"
+                  size="1"
+                  variant="ghost"
+                  onClick={onDeselectAll}
+                  disabled={selectedValues.length === 0}
+                >
+                  {t("deselectAll")}
+                </Button>
+              )}
             </Flex>
           </Flex>
 
@@ -150,6 +163,55 @@ export const ColumnFilterModalPresenter: FC<
                 >
                   {t("noMatchingValues")}
                 </Text>
+              ) : isSingleSelect ? (
+                <RadioGroup.Root
+                  value={selectedValues[0] ?? ""}
+                  onValueChange={(val) => onToggleValue(val)}
+                >
+                  <Flex direction="column" gap="2">
+                    {filteredOptions.map((opt) => {
+                      const isBlank = opt.value === "";
+                      return (
+                        <Text
+                          as="label"
+                          size="2"
+                          key={opt.value || "__blank__"}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          <RadioGroup.Item value={opt.value} />
+                          {isBlank ? (
+                            <Text color="gray" style={{ fontStyle: "italic" }}>
+                              {t("blankValue")}
+                            </Text>
+                          ) : (
+                            <Flex
+                              align="center"
+                              gap="1"
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <Text weight="medium">{opt.value}</Text>
+                              {opt.detail && (
+                                <Text size="1" color="gray">
+                                  ({opt.detail})
+                                </Text>
+                              )}
+                            </Flex>
+                          )}
+                        </Text>
+                      );
+                    })}
+                  </Flex>
+                </RadioGroup.Root>
               ) : (
                 <Flex direction="column" gap="2">
                   {filteredOptions.map((opt) => {

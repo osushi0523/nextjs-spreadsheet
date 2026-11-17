@@ -226,6 +226,17 @@ export const productionVolumeTemplate: SheetTemplate = {
       align: "right",
     },
   ],
+  filters: [
+    { field: "accounting_unit_code", required: true, selectionType: "single" },
+    { field: "office_code", required: true, selectionType: "single" },
+    {
+      field: "production_year_month",
+      required: false,
+      selectionType: "multiple",
+    },
+    { field: "cost_dept_code", required: false, selectionType: "multiple" },
+    { field: "cost_spec", required: false, selectionType: "multiple" },
+  ],
 };
 
 export const accountingUnitTemplate: SheetTemplate = {

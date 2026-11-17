@@ -11,6 +11,7 @@ import { useI18n } from "@/i18n/useI18n";
 import {
   activeColumnConfigFamily,
   activeColumnFilterFamily,
+  activeSheetIdAtom,
   type ColumnId,
   cellEditsAtom,
   clearColumnFilterAtom,
@@ -18,6 +19,7 @@ import {
   columnUniqueValuesFamily,
   referencedSheetsDataAtom,
   setColumnFilterAtom,
+  sheetTemplatesAtom,
 } from "../stores";
 import type {
   ColumnFilterModalPresenterProps,
@@ -54,6 +56,13 @@ export const ColumnFilterModalContainer: FC<
   const cellEdits = useAtomValue(cellEditsAtom);
 
   const isFilterActive = existingFilter !== undefined;
+
+  const activeSheetId = useAtomValue(activeSheetIdAtom);
+  const templates = useAtomValue(sheetTemplatesAtom);
+  const template = activeSheetId ? templates[activeSheetId] : undefined;
+  const filterDef = template?.filters?.find((f) => f.field === targetColId);
+  const isSingleSelect = filterDef?.selectionType === "single";
+  const isRequired = Boolean(filterDef?.required);
 
   const options: FilterOption[] = useMemo(() => {
     if (config?.type === "pulldown") {
@@ -104,7 +113,10 @@ export const ColumnFilterModalContainer: FC<
     if (existingFilter) {
       return existingFilter.selectedValues;
     }
-    return uniqueValues;
+    if (isSingleSelect && isRequired) {
+      return uniqueValues.length > 0 ? [uniqueValues[0]] : [];
+    }
+    return isSingleSelect ? [] : uniqueValues;
   });
 
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -114,45 +126,70 @@ export const ColumnFilterModalContainer: FC<
     if (open) {
       if (existingFilter) {
         setSelectedValues(existingFilter.selectedValues);
+      } else if (isSingleSelect && isRequired) {
+        setSelectedValues(uniqueValues.length > 0 ? [uniqueValues[0]] : []);
       } else {
-        setSelectedValues(uniqueValues);
+        setSelectedValues(isSingleSelect ? [] : uniqueValues);
       }
       setSearchQuery("");
     }
-  }, [open, existingFilter, uniqueValues]);
+  }, [open, existingFilter, uniqueValues, isSingleSelect, isRequired]);
 
   const setColumnFilter = useSetAtom(setColumnFilterAtom);
   const clearColumnFilter = useSetAtom(clearColumnFilterAtom);
 
-  const handleToggleValue = useCallback((value: string) => {
-    setSelectedValues((prev) => {
-      if (prev.includes(value)) {
-        return prev.filter((v) => v !== value);
-      }
-      return [...prev, value];
-    });
-  }, []);
+  const handleToggleValue = useCallback(
+    (value: string) => {
+      setSelectedValues((prev) => {
+        if (isSingleSelect) {
+          if (isRequired) {
+            return [value];
+          }
+          return prev.includes(value) ? [] : [value];
+        }
+        if (prev.includes(value)) {
+          return prev.filter((v) => v !== value);
+        }
+        return [...prev, value];
+      });
+    },
+    [isSingleSelect, isRequired],
+  );
 
   const handleSelectAll = useCallback(() => {
-    setSelectedValues(uniqueValues);
-  }, [uniqueValues]);
+    if (!isSingleSelect) {
+      setSelectedValues(uniqueValues);
+    }
+  }, [isSingleSelect, uniqueValues]);
 
   const handleDeselectAll = useCallback(() => {
     setSelectedValues([]);
   }, []);
 
   const handleApply = useCallback(() => {
-    // If all unique values are selected, it is equivalent to no filter
-    if (selectedValues.length === uniqueValues.length) {
-      clearColumnFilter(targetColId);
+    if (isSingleSelect) {
+      if (selectedValues.length === 0) {
+        clearColumnFilter(targetColId);
+      } else {
+        setColumnFilter({
+          colId: targetColId,
+          selectedValues,
+        });
+      }
     } else {
-      setColumnFilter({
-        colId: targetColId,
-        selectedValues,
-      });
+      // If all unique values are selected, it is equivalent to no filter
+      if (selectedValues.length === uniqueValues.length) {
+        clearColumnFilter(targetColId);
+      } else {
+        setColumnFilter({
+          colId: targetColId,
+          selectedValues,
+        });
+      }
     }
     onOpenChange(false);
   }, [
+    isSingleSelect,
     selectedValues,
     uniqueValues,
     clearColumnFilter,
@@ -187,6 +224,8 @@ export const ColumnFilterModalContainer: FC<
         onClearFilter: handleClearFilter,
         onCancel: handleCancel,
         isFilterActive,
+        isSingleSelect,
+        isRequired,
       })}
     </>
   );

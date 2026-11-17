@@ -18,6 +18,8 @@ import { PdfPreviewPresenter } from "./PdfPreview/PdfPreview.presenter";
 import { usePdfPreview } from "./PdfPreview/usePdfPreview.container";
 import { RowStatusContainer } from "./RowStatus/RowStatus.container";
 import { RowStatusPresenter } from "./RowStatus/RowStatus.presenter";
+import { SearchFilterBarPresenter } from "./SearchFilterBar/SearchFilterBar.presenter";
+import { useSearchFilterBar } from "./SearchFilterBar/useSearchFilterBar.container";
 import { ColumnHeaderContainer } from "./Sheet/ColumnHeader.container";
 import { ColumnHeaderPresenter } from "./Sheet/ColumnHeader.presenter";
 import { SheetContainer, type SheetHandle } from "./Sheet/Sheet.container";
@@ -134,6 +136,8 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
     isSaving,
   });
 
+  const searchFilterBarProps = useSearchFilterBar();
+
   const drawerProps = useSheetMenuDrawer({
     open: isDrawerOpen,
     onOpenChange: setIsDrawerOpen,
@@ -214,6 +218,7 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
     <>
       <WorkbookPresenter
         toolbar={<ToolbarPresenter {...toolbarProps} />}
+        filterBar={<SearchFilterBarPresenter {...searchFilterBarProps} />}
         tabs={
           <SheetTabsPresenter
             activeSheetId={activeSheetId}

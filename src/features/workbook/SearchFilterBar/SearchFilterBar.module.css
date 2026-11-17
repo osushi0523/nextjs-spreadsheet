@@ -1,0 +1,159 @@
+.filterBar {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background-color: var(--gray-1);
+  border-bottom: 1px solid var(--gray-a4);
+  padding: 0 16px;
+  overflow: visible;
+  transition: max-height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  font-size: var(--font-size-2);
+  font-weight: 600;
+  color: var(--gray-12);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.collapsedSummaryGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: pointer;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.collapsedSummaryGroup::-webkit-scrollbar {
+  display: none;
+}
+
+.emptyHint {
+  color: var(--gray-9);
+  font-size: var(--font-size-1);
+  user-select: none;
+}
+
+.summaryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+
+.chipDeleteButton {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  padding: 1px;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+.chipDeleteButton:hover {
+  background-color: var(--blue-a4);
+}
+
+.content {
+  padding: 8px 6px 14px 0;
+  border-top: 1px dashed var(--gray-a4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  max-height: 148px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-a5) transparent;
+}
+
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: var(--gray-a5);
+  border-radius: var(--radius-full);
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-a7);
+}
+
+.filterItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+  max-width: 250px;
+  flex: 1 1 170px;
+}
+
+.itemLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-1);
+  font-weight: 500;
+  color: var(--gray-11);
+}
+
+.requiredStar {
+  color: var(--red-9);
+  font-weight: bold;
+}
+
+.multiSelectTrigger {
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multiSelectPopoverContent {
+  width: 280px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
