@@ -1,4 +1,4 @@
-import { atom, type Getter } from "jotai";
+import { atom, type Getter, type Setter } from "jotai";
 import { sheetRecordsQuery } from "../services/sheetRecords/sheetRecords.query";
 import { baseCellValuesAtom } from "./base";
 import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
@@ -16,23 +16,32 @@ import {
   touchedCellsAtom,
 } from "./edit";
 import { activeColumnFiltersAtom, visibleRowOrderAtom } from "./filter";
+import { sheetTemplatesAtom } from "./templates";
 import {
   type CellAddress,
   type CellStatusInfo,
   type ColumnConfig,
   type ColumnId,
+  type CopiedCellEntry,
   createColumnId,
   createRowId,
   type InsertPosition,
   isSubtotalRowId,
   type LookupColumnDefinition,
   type MoveDirection,
+  type PasteColumnMismatch,
   type PulldownMode,
   parseRowIndex,
   type RowId,
   type RowStatus,
+  type Selection,
 } from "./types";
-import { activeSheetIdAtom, selectionAtom } from "./ui";
+import {
+  activeSheetIdAtom,
+  internalClipboardAtom,
+  pendingPasteConfirmationAtom,
+  selectionAtom,
+} from "./ui";
 import { asyncValidationErrorsAtom } from "./validation";
 
 export const resetRowStatusesAtom = atom(null, (get, set) => {
@@ -113,6 +122,7 @@ export const addRowAtom = atom(null, (get, set) => {
     ...get(rowStatusesAtom),
     [newId]: "added",
   });
+  set(internalClipboardAtom, null);
 });
 
 export const insertRowAtom = atom(
@@ -142,6 +152,7 @@ export const insertRowAtom = atom(
       ...get(rowStatusesAtom),
       [newId]: "added",
     });
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -151,6 +162,7 @@ export const deleteRowAtom = atom(null, (get, set, rowId: RowId) => {
     ...rowStatuses,
     [rowId]: "deleted",
   });
+  set(internalClipboardAtom, null);
 });
 
 export const duplicateRowAtom = atom(
@@ -193,6 +205,7 @@ export const duplicateRowAtom = atom(
       ...get(rowStatusesAtom),
       [newId]: "added",
     });
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -254,7 +267,31 @@ const applyCellEdit = (
   return true;
 };
 
-export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
+type SelectionBounds = {
+  minRow: number;
+  maxRow: number;
+  minCol: number;
+  maxCol: number;
+};
+
+const normalizeSelectionBounds = (
+  selection: NonNullable<Selection>,
+): SelectionBounds => ({
+  minRow: Math.min(selection.start.row, selection.end.row),
+  maxRow: Math.max(selection.start.row, selection.end.row),
+  minCol: Math.min(selection.start.col, selection.end.col),
+  maxCol: Math.max(selection.start.col, selection.end.col),
+});
+
+const isSingleValueFill = (
+  rowsData: readonly (readonly unknown[])[],
+  bounds: SelectionBounds,
+): boolean =>
+  rowsData.length === 1 &&
+  rowsData[0].length === 1 &&
+  (bounds.minRow !== bounds.maxRow || bounds.minCol !== bounds.maxCol);
+
+const applyPasteValues = (get: Getter, set: Setter, rowsData: string[][]) => {
   const selection = get(selectionAtom);
   if (!selection || rowsData.length === 0) return;
 
@@ -266,10 +303,8 @@ export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
   const currentEdits = get(cellEditsAtom);
   const currentRowStatuses = get(rowStatusesAtom);
 
-  const minRow = Math.min(selection.start.row, selection.end.row);
-  const maxRow = Math.max(selection.start.row, selection.end.row);
-  const minCol = Math.min(selection.start.col, selection.end.col);
-  const maxCol = Math.max(selection.start.col, selection.end.col);
+  const bounds = normalizeSelectionBounds(selection);
+  const { minRow, maxRow, minCol, maxCol } = bounds;
 
   const nextEdits = { ...currentEdits };
   const nextRowStatuses: Record<RowId, RowStatus> = { ...currentRowStatuses };
@@ -299,10 +334,7 @@ export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
     );
   };
 
-  const isSingleValueToRange =
-    rowsData.length === 1 &&
-    rowsData[0].length === 1 &&
-    (minRow !== maxRow || minCol !== maxCol);
+  const isSingleValueToRange = isSingleValueFill(rowsData, bounds);
 
   // lookup 列は上書き対象からスキップして次の列へ割り当てる
   const targetColIndices = columnOrder
@@ -366,6 +398,227 @@ export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
     set(cellEditsAtom, nextEdits);
     set(rowStatusesAtom, nextRowStatuses);
   }
+};
+
+export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
+  applyPasteValues(get, set, rowsData);
+});
+
+const formatTsvCell = (value: string): string => {
+  if (
+    value.includes('"') ||
+    value.includes("\t") ||
+    value.includes("\n") ||
+    value.includes("\r")
+  ) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+  return value;
+};
+
+const formatTsvMatrix = (rows: CopiedCellEntry[][]): string =>
+  rows
+    .map((row) => row.map((cell) => formatTsvCell(cell.value)).join("\t"))
+    .join("\n");
+
+export const copySelectionAtom = atom(null, (get, set): string | null => {
+  const selection = get(selectionAtom);
+  const activeSheetId = get(activeSheetIdAtom);
+  if (!selection || !activeSheetId) return null;
+
+  const visibleRowOrder = get(visibleRowOrderAtom);
+  const columnOrder = get(columnOrderAtom);
+  const activeConfigs = get(activeColumnConfigsAtom);
+  const columnNames = get(columnNamesAtom);
+  const rowStatuses = get(rowStatusesAtom);
+
+  const { minRow, maxRow, minCol, maxCol } =
+    normalizeSelectionBounds(selection);
+
+  const targetRows = visibleRowOrder
+    .slice(minRow, maxRow + 1)
+    .filter(
+      (rowId) => !isSubtotalRowId(rowId) && rowStatuses[rowId] !== "deleted",
+    );
+
+  const targetCols = columnOrder
+    .slice(minCol, maxCol + 1)
+    .filter((colId) => activeConfigs[colId]?.type !== "lookup");
+
+  if (targetRows.length === 0 || targetCols.length === 0) {
+    return null;
+  }
+
+  const rows: CopiedCellEntry[][] = targetRows.map((rowId) =>
+    targetCols.map((colId) => ({
+      value: get(cellFamily({ rowId, colId })),
+      sourceColId: colId,
+      sourceColName: columnNames[colId] ?? String(colId),
+    })),
+  );
+
+  const tsvText = formatTsvMatrix(rows);
+
+  set(internalClipboardAtom, {
+    sourceSheetId: activeSheetId,
+    sourceRange: {
+      sheetId: activeSheetId,
+      start: { row: minRow, col: minCol },
+      end: { row: maxRow, col: maxCol },
+    },
+    rows,
+    tsvText,
+  });
+
+  return tsvText;
+});
+
+export const clearCopyModeAtom = atom(null, (_get, set) => {
+  set(internalClipboardAtom, null);
+});
+
+const collectPasteMismatches = ({
+  sourceSheetId,
+  activeSheetId,
+  rows,
+  bounds,
+  visibleRowOrder,
+  columnOrder,
+  activeConfigs,
+  columnNames,
+  rowStatuses,
+}: {
+  sourceSheetId: string;
+  activeSheetId: string;
+  rows: CopiedCellEntry[][];
+  bounds: SelectionBounds;
+  visibleRowOrder: RowId[];
+  columnOrder: ColumnId[];
+  activeConfigs: Record<ColumnId, ColumnConfig>;
+  columnNames: Record<ColumnId, string>;
+  rowStatuses: Record<RowId, RowStatus>;
+}): PasteColumnMismatch[] => {
+  const { minRow, maxRow, minCol, maxCol } = bounds;
+  const isSameSheet = sourceSheetId === activeSheetId;
+  const isSingleValueToRange = isSingleValueFill(rows, bounds);
+
+  const seen = new Set<string>();
+  const mismatches: PasteColumnMismatch[] = [];
+
+  const checkCellPair = (
+    rowId: RowId | undefined,
+    targetColId: ColumnId | undefined,
+    sourceEntry: CopiedCellEntry | undefined,
+  ) => {
+    if (!rowId || !targetColId || !sourceEntry) return;
+    if (!isCellEditable(activeConfigs[targetColId], rowId, rowStatuses)) {
+      return;
+    }
+    if (isSameSheet && sourceEntry.sourceColId === targetColId) {
+      return;
+    }
+    const pairKey = `${sourceEntry.sourceColId}->${targetColId}`;
+    if (seen.has(pairKey)) return;
+    seen.add(pairKey);
+    mismatches.push({
+      sourceColId: sourceEntry.sourceColId,
+      sourceColName: sourceEntry.sourceColName,
+      targetColId,
+      targetColName: columnNames[targetColId] ?? String(targetColId),
+    });
+  };
+
+  if (isSingleValueToRange) {
+    const sourceEntry = rows[0][0];
+    const targetRows = visibleRowOrder.slice(minRow, maxRow + 1);
+    const targetCols = columnOrder.slice(minCol, maxCol + 1);
+    for (const rowId of targetRows) {
+      for (const targetColId of targetCols) {
+        checkCellPair(rowId, targetColId, sourceEntry);
+      }
+    }
+    return mismatches;
+  }
+
+  const targetColIds = columnOrder
+    .slice(minCol)
+    .filter((colId) => activeConfigs[colId]?.type !== "lookup");
+  const targetRows = visibleRowOrder.slice(minRow, minRow + rows.length);
+
+  targetRows.forEach((rowId, rOffset) => {
+    const sourceRow = rows[rOffset];
+    if (!sourceRow) return;
+    const colCount = Math.min(sourceRow.length, targetColIds.length);
+    for (let cOffset = 0; cOffset < colCount; cOffset++) {
+      checkCellPair(rowId, targetColIds[cOffset], sourceRow[cOffset]);
+    }
+  });
+
+  return mismatches;
+};
+
+export const requestInternalPasteAtom = atom(null, (get, set) => {
+  const clipboard = get(internalClipboardAtom);
+  const selection = get(selectionAtom);
+  const activeSheetId = get(activeSheetIdAtom);
+  if (!clipboard || !selection || !activeSheetId) return;
+
+  const visibleRowOrder = get(visibleRowOrderAtom);
+  const columnOrder = get(columnOrderAtom);
+  const activeConfigs = get(activeColumnConfigsAtom);
+  const columnNames = get(columnNamesAtom);
+  const rowStatuses = get(rowStatusesAtom);
+  const templates = get(sheetTemplatesAtom);
+
+  const bounds = normalizeSelectionBounds(selection);
+
+  const mismatches = collectPasteMismatches({
+    sourceSheetId: clipboard.sourceSheetId,
+    activeSheetId,
+    rows: clipboard.rows,
+    bounds,
+    visibleRowOrder,
+    columnOrder,
+    activeConfigs,
+    columnNames,
+    rowStatuses,
+  });
+
+  if (mismatches.length > 0) {
+    set(pendingPasteConfirmationAtom, {
+      rowsData: clipboard.rows,
+      mismatches,
+      isCrossSheet: clipboard.sourceSheetId !== activeSheetId,
+      sourceSheetName:
+        templates[clipboard.sourceSheetId]?.name ?? clipboard.sourceSheetId,
+      targetSheetName: templates[activeSheetId]?.name ?? activeSheetId,
+    });
+    return;
+  }
+
+  applyPasteValues(
+    get,
+    set,
+    clipboard.rows.map((row) => row.map((cell) => cell.value)),
+  );
+  set(internalClipboardAtom, null);
+});
+
+export const confirmPendingPasteAtom = atom(null, (get, set) => {
+  const pending = get(pendingPasteConfirmationAtom);
+  if (!pending) return;
+
+  applyPasteValues(
+    get,
+    set,
+    pending.rowsData.map((row) => row.map((cell) => cell.value)),
+  );
+  set(pendingPasteConfirmationAtom, null);
+  set(internalClipboardAtom, null);
+});
+
+export const cancelPendingPasteAtom = atom(null, (_get, set) => {
+  set(pendingPasteConfirmationAtom, null);
 });
 
 export type ApplyColumnBindingPayload = {
@@ -462,6 +715,7 @@ export const applyColumnBindingAtom = atom(
       ...get(columnConfigsAtom),
       [activeSheetId]: colConfigs,
     });
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -492,6 +746,7 @@ export const removeColumnBindingAtom = atom(
       ...get(columnConfigsAtom),
       [activeSheetId]: currentConfigs,
     });
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -577,6 +832,7 @@ export const reorderColumnsWithFollowersAtom = atom(
 
     const newOrder = nextGroups.flatMap((g) => g.members);
     set(columnOrderAtom, newOrder);
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -716,10 +972,8 @@ export const clearSelectedCellsAtom = atom(null, (get, set) => {
   const currentEdits = get(cellEditsAtom);
   const currentRowStatuses = get(rowStatusesAtom);
 
-  const minRow = Math.min(selection.start.row, selection.end.row);
-  const maxRow = Math.max(selection.start.row, selection.end.row);
-  const minCol = Math.min(selection.start.col, selection.end.col);
-  const maxCol = Math.max(selection.start.col, selection.end.col);
+  const { minRow, maxRow, minCol, maxCol } =
+    normalizeSelectionBounds(selection);
 
   let hasChanges = false;
   const nextEdits = { ...currentEdits };

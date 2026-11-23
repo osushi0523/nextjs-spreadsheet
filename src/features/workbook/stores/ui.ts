@@ -2,6 +2,8 @@ import { atom } from "jotai";
 import type {
   ActiveCell,
   ColumnId,
+  InternalClipboardState,
+  PendingPasteConfirmation,
   Selection,
   ViewMode,
   WorkbookStatus,
@@ -10,6 +12,9 @@ import type {
 export const workbookStatusAtom = atom<WorkbookStatus>("idle");
 export const activeCellAtom = atom<ActiveCell>(null);
 export const selectionAtom = atom<Selection>(null);
+export const internalClipboardAtom = atom<InternalClipboardState>(null);
+export const pendingPasteConfirmationAtom =
+  atom<PendingPasteConfirmation>(null);
 
 // --- UI State (純粋な UI 状態として管理。初期値フォールバックはコンテナ層で行う) ---
 export const openSheetIdsAtom = atom<string[] | null>(null);

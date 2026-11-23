@@ -1,8 +1,13 @@
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useEffect } from "react";
 import {
   activeSheetModeAtom,
+  clearCopyModeAtom,
+  copySelectionAtom,
+  internalClipboardAtom,
   pasteCellsAtom,
+  pendingPasteConfirmationAtom,
+  requestInternalPasteAtom,
   workbookStatusAtom,
 } from "../stores";
 
@@ -27,25 +32,74 @@ const parseClipboardTsv = (text: string): string[][] => {
   );
 };
 
+const isEditableElement = (element: Element | null): boolean =>
+  element instanceof HTMLElement &&
+  (element.tagName === "INPUT" ||
+    element.tagName === "TEXTAREA" ||
+    element.isContentEditable);
+
+const isModalOrDrawerOpen = (): boolean =>
+  typeof document !== "undefined" &&
+  document.querySelector('[role="dialog"], [role="alertdialog"]') !== null;
+
+const normalizeLineEndings = (text: string): string =>
+  text.replace(/\r\n/g, "\n").replace(/\n$/, "");
+
 export const useSheetClipboard = () => {
+  const store = useStore();
   const sheetMode = useAtomValue(activeSheetModeAtom);
+  const copySelection = useSetAtom(copySelectionAtom);
+  const clearCopyMode = useSetAtom(clearCopyModeAtom);
+  const requestInternalPaste = useSetAtom(requestInternalPasteAtom);
   const pasteCells = useSetAtom(pasteCellsAtom);
   const setStatus = useSetAtom(workbookStatusAtom);
 
   useEffect(() => {
+    const handleCopy = (event: ClipboardEvent) => {
+      if (isModalOrDrawerOpen() || isEditableElement(document.activeElement)) {
+        return;
+      }
+
+      const tsvText = copySelection();
+      if (tsvText === null) return;
+
+      event.preventDefault();
+      event.clipboardData?.setData("text/plain", tsvText);
+    };
+
+    window.addEventListener("copy", handleCopy);
+    return () => {
+      window.removeEventListener("copy", handleCopy);
+    };
+  }, [copySelection]);
+
+  useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
-      if (sheetMode === "inquiry") return;
+      if (
+        sheetMode === "inquiry" ||
+        isModalOrDrawerOpen() ||
+        store.get(pendingPasteConfirmationAtom) !== null
+      ) {
+        return;
+      }
+      if (isEditableElement(document.activeElement)) return;
 
-      const activeElement = document.activeElement;
-      const isInput =
-        activeElement instanceof HTMLElement &&
-        (activeElement.tagName === "INPUT" ||
-          activeElement.tagName === "TEXTAREA" ||
-          activeElement.isContentEditable);
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      const internalClipboard = store.get(internalClipboardAtom);
 
-      if (isInput) return;
+      if (internalClipboard) {
+        const isSameAsInternalCopy =
+          normalizeLineEndings(text) ===
+          normalizeLineEndings(internalClipboard.tsvText);
 
-      const text = event.clipboardData?.getData("text/plain");
+        if (isSameAsInternalCopy) {
+          event.preventDefault();
+          requestInternalPaste();
+          return;
+        }
+        clearCopyMode();
+      }
+
       if (!text) return;
 
       const rowsData = parseClipboardTsv(text);
@@ -59,7 +113,7 @@ export const useSheetClipboard = () => {
     return () => {
       window.removeEventListener("paste", handlePaste);
     };
-  }, [pasteCells, sheetMode]);
+  }, [sheetMode, store, requestInternalPaste, clearCopyMode, pasteCells]);
 
   useEffect(() => {
     const handleMouseUp = () => {

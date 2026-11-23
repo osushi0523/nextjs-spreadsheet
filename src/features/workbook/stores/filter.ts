@@ -5,7 +5,7 @@ import { activeColumnConfigsAtom, getLookupValue } from "./binding";
 import { columnOrderAtom, rowOrderAtom } from "./derived";
 import { cellEditsAtom, rowStatusesAtom } from "./edit";
 import type { ColumnFilter, ColumnId, RowId } from "./types";
-import { activeSheetIdAtom } from "./ui";
+import { activeSheetIdAtom, internalClipboardAtom } from "./ui";
 
 // sheetId -> Record<ColumnId, ColumnFilter>
 export const columnFiltersAtom = atom<
@@ -180,6 +180,7 @@ export const setColumnFilterAtom = atom(
       ...currentFilters,
       [colId]: { selectedValues },
     });
+    set(internalClipboardAtom, null);
   },
 );
 
@@ -190,6 +191,7 @@ export const clearColumnFilterAtom = atom(null, (get, set, colId: ColumnId) => {
   const currentFilters = { ...get(activeColumnFiltersAtom) };
   delete currentFilters[colId];
   set(activeColumnFiltersAtom, currentFilters);
+  set(internalClipboardAtom, null);
 });
 
 export const clearAllFiltersAtom = atom(null, (get, set) => {
@@ -197,4 +199,5 @@ export const clearAllFiltersAtom = atom(null, (get, set) => {
   if (!activeSheetId) return;
 
   set(activeColumnFiltersAtom, {});
+  set(internalClipboardAtom, null);
 });

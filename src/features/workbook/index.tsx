@@ -14,6 +14,8 @@ import { ColumnSettingModalPresenter } from "./ColumnSettingModal/ColumnSettingM
 import { EmptySheetPresenter } from "./EmptySheet.presenter";
 import { localMessages } from "./i18n";
 import { LoadingOverlayPresenter } from "./LoadingOverlay.presenter";
+import { PasteConfirmModalPresenter } from "./PasteConfirmModal/PasteConfirmModal.presenter";
+import { usePasteConfirmModal } from "./PasteConfirmModal/usePasteConfirmModal.container";
 import { PdfPreviewPresenter } from "./PdfPreview/PdfPreview.presenter";
 import { usePdfPreview } from "./PdfPreview/usePdfPreview.container";
 import { RowStatusContainer } from "./RowStatus/RowStatus.container";
@@ -140,6 +142,11 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
 
   const searchFilterBarProps = useSearchFilterBar();
   const statusBarProps = useStatusBar();
+  const pasteConfirmModalProps = usePasteConfirmModal({
+    onAfterClose: () => {
+      sheetRef.current?.focusSheet();
+    },
+  });
 
   const drawerProps = useSheetMenuDrawer({
     open: isDrawerOpen,
@@ -278,6 +285,7 @@ const WorkbookRoot: FC<WorkbookProps> = ({ customValidators }) => {
           {(modalProps) => <ColumnFilterModalPresenter {...modalProps} />}
         </ColumnFilterModalContainer>
       )}
+      <PasteConfirmModalPresenter {...pasteConfirmModalProps} />
       <ToastPresenter {...toastProps} />
       <LoadingOverlayPresenter open={isSaving} message={t("saving")} />
     </>

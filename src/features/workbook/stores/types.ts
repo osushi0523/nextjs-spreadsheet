@@ -307,3 +307,37 @@ export type SheetTemplateRaw = {
   subtotalConfig?: SubtotalConfigRaw;
   filters?: SheetFilterDefinitionRaw[];
 };
+
+export type CopiedCellEntry = {
+  value: string;
+  sourceColId: ColumnId;
+  sourceColName: string;
+};
+
+export type CopySourceRange = {
+  sheetId: string;
+  start: { row: number; col: number };
+  end: { row: number; col: number };
+};
+
+export type InternalClipboardState = {
+  sourceSheetId: string;
+  sourceRange: CopySourceRange;
+  rows: CopiedCellEntry[][];
+  tsvText: string;
+} | null;
+
+export type PasteColumnMismatch = {
+  sourceColId: ColumnId;
+  sourceColName: string;
+  targetColId: ColumnId;
+  targetColName: string;
+};
+
+export type PendingPasteConfirmation = {
+  rowsData: CopiedCellEntry[][];
+  mismatches: PasteColumnMismatch[];
+  isCrossSheet: boolean;
+  sourceSheetName: string;
+  targetSheetName: string;
+} | null;

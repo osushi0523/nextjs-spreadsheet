@@ -21,6 +21,25 @@
   box-sizing: border-box;
 }
 
+.sheet__copyRange {
+  position: absolute;
+  border: 2px dashed var(--accent-11);
+  pointer-events: none;
+  z-index: 6;
+  box-sizing: border-box;
+  animation: copyRangePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes copyRangePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .sheet__cellsLayer {
   position: absolute;
   top: 0;

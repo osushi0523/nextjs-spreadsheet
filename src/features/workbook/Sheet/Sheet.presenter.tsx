@@ -37,25 +37,27 @@ export type ItemLayout = {
   size: number;
 };
 
-const SelectionOverlay = ({
-  selection,
+const RangeOverlay = ({
+  range,
+  className,
   rows,
   columns,
   getRowLayout,
   getColumnLayout,
 }: {
-  selection?: Selection;
+  range?: Selection;
+  className: string;
   rows?: AxisLayout[];
   columns?: AxisLayout[];
   getRowLayout?: (index: number) => ItemLayout | undefined;
   getColumnLayout?: (index: number) => ItemLayout | undefined;
 }) => {
-  if (!selection) return null;
+  if (!range) return null;
 
-  const minRow = Math.min(selection.start.row, selection.end.row);
-  const maxRow = Math.max(selection.start.row, selection.end.row);
-  const minCol = Math.min(selection.start.col, selection.end.col);
-  const maxCol = Math.max(selection.start.col, selection.end.col);
+  const minRow = Math.min(range.start.row, range.end.row);
+  const maxRow = Math.max(range.start.row, range.end.row);
+  const minCol = Math.min(range.start.col, range.end.col);
+  const maxCol = Math.max(range.start.col, range.end.col);
 
   const startRow = getRowLayout
     ? getRowLayout(minRow)
@@ -74,7 +76,7 @@ const SelectionOverlay = ({
 
   return (
     <div
-      className={styles.sheet__selection}
+      className={className}
       style={{
         left: startCol.start,
         top: startRow.start,
@@ -136,6 +138,7 @@ const SheetRows = memo(
     totalWidth,
     totalHeight,
     selection,
+    copyRange,
     getRowLayout,
     getColumnLayout,
   }: {
@@ -144,6 +147,7 @@ const SheetRows = memo(
     totalWidth: number;
     totalHeight: number;
     selection?: Selection;
+    copyRange?: Selection;
     getRowLayout?: (index: number) => ItemLayout | undefined;
     getColumnLayout?: (index: number) => ItemLayout | undefined;
   }) => {
@@ -155,8 +159,17 @@ const SheetRows = memo(
           height: `${totalHeight}px`,
         }}
       >
-        <SelectionOverlay
-          selection={selection}
+        <RangeOverlay
+          range={selection}
+          className={styles.sheet__selection}
+          rows={rows}
+          columns={columns}
+          getRowLayout={getRowLayout}
+          getColumnLayout={getColumnLayout}
+        />
+        <RangeOverlay
+          range={copyRange}
+          className={styles.sheet__copyRange}
           rows={rows}
           columns={columns}
           getRowLayout={getRowLayout}
@@ -208,6 +221,7 @@ type BodyProps = {
   totalWidth: number;
   totalHeight: number;
   selection?: Selection;
+  copyRange?: Selection;
   getRowLayout?: (index: number) => ItemLayout | undefined;
   getColumnLayout?: (index: number) => ItemLayout | undefined;
 };
@@ -219,6 +233,7 @@ const SheetBody = memo(
     totalWidth,
     totalHeight,
     selection,
+    copyRange,
     getRowLayout,
     getColumnLayout,
   }: BodyProps) => {
@@ -240,6 +255,7 @@ const SheetBody = memo(
             totalWidth={totalWidth}
             totalHeight={totalHeight}
             selection={selection}
+            copyRange={copyRange}
             getRowLayout={getRowLayout}
             getColumnLayout={getColumnLayout}
           />
@@ -421,6 +437,7 @@ export const SheetPresenter: FC<SheetPresenterProps> = ({
   totalWidth,
   totalHeight,
   selection,
+  copyRange,
   getRowLayout,
   getColumnLayout,
   onChangeColumnWidth,
@@ -463,6 +480,7 @@ export const SheetPresenter: FC<SheetPresenterProps> = ({
           totalWidth={totalWidth}
           totalHeight={totalHeight}
           selection={selection}
+          copyRange={copyRange}
           getRowLayout={getRowLayout}
           getColumnLayout={getColumnLayout}
         />

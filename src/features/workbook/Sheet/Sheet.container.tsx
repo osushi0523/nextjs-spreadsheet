@@ -23,8 +23,10 @@ import {
   activeColumnSummaryValuesAtom,
   activeSheetModeAtom,
   type ColumnId,
+  clearCopyModeAtom,
   clearSelectedCellsAtom,
   hasActiveColumnTotalsAtom,
+  internalClipboardAtom,
   isColumnId,
   moveSelectionAtom,
   type RowId,
@@ -78,6 +80,7 @@ const SheetPrefetcher: FC<{ sheetId: string }> = ({ sheetId }) => {
 const SheetInner: FC<
   SheetContainerProps & { sheetRef?: ForwardedRef<SheetHandle> }
 > = ({
+  activeSheetId,
   renderCell,
   renderRowStatus,
   renderColumnHeader,
@@ -87,6 +90,8 @@ const SheetInner: FC<
   const sheetMode = useAtomValue(activeSheetModeAtom);
   const moveSelection = useSetAtom(moveSelectionAtom);
   const clearSelectedCells = useSetAtom(clearSelectedCellsAtom);
+  const internalClipboard = useAtomValue(internalClipboardAtom);
+  const clearCopyMode = useSetAtom(clearCopyModeAtom);
 
   // 1. 仮想スクロール & レイアウト計測 Hook
   const {
@@ -131,6 +136,8 @@ const SheetInner: FC<
     clearSelectedCells,
     ensureCellVisible,
     focusSheet,
+    isCopyMode: internalClipboard !== null,
+    onClearCopyMode: clearCopyMode,
   });
 
   // 4. クリップボード貼り付け & 選択終了監視 Hook
@@ -211,6 +218,17 @@ const SheetInner: FC<
     [summaryValues],
   );
 
+  const copyRange = useMemo(
+    () =>
+      internalClipboard && internalClipboard.sourceSheetId === activeSheetId
+        ? {
+            start: internalClipboard.sourceRange.start,
+            end: internalClipboard.sourceRange.end,
+          }
+        : null,
+    [internalClipboard, activeSheetId],
+  );
+
   return (
     <DndContext
       sensors={sensors}
@@ -225,6 +243,7 @@ const SheetInner: FC<
         {children({
           ref: parentRef,
           selection,
+          copyRange,
           rows: composedRows,
           columns: composedColumns,
           totalWidth: columnVirtualizer.getTotalSize(),

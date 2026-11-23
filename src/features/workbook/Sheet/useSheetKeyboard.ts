@@ -39,6 +39,8 @@ export type UseSheetKeyboardParams = {
   clearSelectedCells: () => void;
   ensureCellVisible: (row: number, col: number) => void;
   focusSheet: () => void;
+  isCopyMode?: boolean;
+  onClearCopyMode?: () => void;
 };
 
 export const useSheetKeyboard = ({
@@ -54,6 +56,8 @@ export const useSheetKeyboard = ({
   clearSelectedCells,
   ensureCellVisible,
   focusSheet,
+  isCopyMode = false,
+  onClearCopyMode,
 }: UseSheetKeyboardParams) => {
   const startEditableCell = useCallback(
     (initialValue: string) => {
@@ -184,6 +188,12 @@ export const useSheetKeyboard = ({
           event.preventDefault();
           clearSelectedCells();
           return;
+        case "Escape":
+          if (isCopyMode) {
+            event.preventDefault();
+            onClearCopyMode?.();
+          }
+          return;
         default:
           break;
       }
@@ -210,6 +220,8 @@ export const useSheetKeyboard = ({
       moveAndScroll,
       sheetMode,
       clearSelectedCells,
+      isCopyMode,
+      onClearCopyMode,
       parentRef,
     ],
   );
