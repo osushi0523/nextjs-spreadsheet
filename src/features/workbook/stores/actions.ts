@@ -1,4 +1,5 @@
 import { atom, type Getter } from "jotai";
+import { sheetRecordsQuery } from "../services/sheetRecords/sheetRecords.query";
 import { baseCellValuesAtom } from "./base";
 import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
 import {
@@ -23,9 +24,11 @@ import {
   createColumnId,
   createRowId,
   type InsertPosition,
+  isSubtotalRowId,
   type LookupColumnDefinition,
   type MoveDirection,
   type PulldownMode,
+  parseRowIndex,
   type RowId,
   type RowStatus,
 } from "./types";
@@ -193,50 +196,176 @@ export const duplicateRowAtom = atom(
   },
 );
 
-export const pasteRowsAtom = atom(null, (get, set, rowsData: string[][]) => {
+const getCellBaseValue = (
+  get: Getter,
+  rowId: RowId,
+  colId: ColumnId,
+  activeSheetId: string | null,
+  baseValues: Record<string, string>,
+): string => {
+  if (activeSheetId) {
+    const rowIndex = parseRowIndex(rowId, activeSheetId);
+    if (rowIndex !== null) {
+      const records = get(sheetRecordsQuery.sync(activeSheetId));
+      return records[rowIndex]?.[colId] ?? "";
+    }
+  }
+  return baseValues[`${rowId}-${colId}`] ?? "";
+};
+
+const isCellEditable = (
+  colConfig: ColumnConfig | undefined,
+  rowId: RowId,
+  rowStatuses: Record<RowId, RowStatus>,
+): boolean => {
+  if (isSubtotalRowId(rowId) || rowStatuses[rowId] === "deleted") {
+    return false;
+  }
+  return !(colConfig?.type === "lookup" || colConfig?.readOnly);
+};
+
+const applyCellEdit = (
+  nextEdits: Record<string, string>,
+  nextRowStatuses: Record<RowId, RowStatus>,
+  rowId: RowId,
+  colId: ColumnId,
+  baseValue: string,
+  newValue: string,
+): boolean => {
+  const key = `${rowId}-${colId}`;
+  const currentValue = key in nextEdits ? nextEdits[key] : baseValue;
+  if (currentValue === newValue) return false;
+
+  if (newValue !== baseValue) {
+    nextEdits[key] = newValue;
+    if ((nextRowStatuses[rowId] ?? "none") === "none") {
+      nextRowStatuses[rowId] = "edited";
+    }
+    return true;
+  }
+
+  delete nextEdits[key];
+  const hasOtherEditsInRow = Object.keys(nextEdits).some((k) =>
+    k.startsWith(`${rowId}-`),
+  );
+  if (!hasOtherEditsInRow && nextRowStatuses[rowId] === "edited") {
+    delete nextRowStatuses[rowId];
+  }
+  return true;
+};
+
+export const pasteCellsAtom = atom(null, (get, set, rowsData: string[][]) => {
+  const selection = get(selectionAtom);
+  if (!selection || rowsData.length === 0) return;
+
+  const visibleRowOrder = get(visibleRowOrderAtom);
   const columnOrder = get(columnOrderAtom);
   const activeConfigs = get(activeColumnConfigsAtom);
-  const currentRowOrder = get(rowOrderAtom);
+  const activeSheetId = get(activeSheetIdAtom);
+  const baseValues = get(baseCellValuesAtom);
   const currentEdits = get(cellEditsAtom);
   const currentRowStatuses = get(rowStatusesAtom);
-  const selection = get(selectionAtom);
 
-  const startCol = 0;
-  const insertIndex = selection
-    ? Math.max(selection.start.row, selection.end.row) + 1
-    : currentRowOrder.length;
+  const minRow = Math.min(selection.start.row, selection.end.row);
+  const maxRow = Math.max(selection.start.row, selection.end.row);
+  const minCol = Math.min(selection.start.col, selection.end.col);
+  const maxCol = Math.max(selection.start.col, selection.end.col);
 
-  const targetColumns = columnOrder.filter(
-    (colId) => activeConfigs[colId]?.type !== "lookup",
+  const nextEdits = { ...currentEdits };
+  const nextRowStatuses: Record<RowId, RowStatus> = { ...currentRowStatuses };
+
+  const tryOverwrite = (
+    rowId: RowId,
+    colId: ColumnId,
+    newValue: string,
+  ): boolean => {
+    if (!isCellEditable(activeConfigs[colId], rowId, currentRowStatuses)) {
+      return false;
+    }
+    const baseValue = getCellBaseValue(
+      get,
+      rowId,
+      colId,
+      activeSheetId,
+      baseValues,
+    );
+    return applyCellEdit(
+      nextEdits,
+      nextRowStatuses,
+      rowId,
+      colId,
+      baseValue,
+      newValue,
+    );
+  };
+
+  const isSingleValueToRange =
+    rowsData.length === 1 &&
+    rowsData[0].length === 1 &&
+    (minRow !== maxRow || minCol !== maxCol);
+
+  // lookup 列は上書き対象からスキップして次の列へ割り当てる
+  const targetColIndices = columnOrder
+    .map((colId, idx) => ({ colId, idx }))
+    .filter(
+      ({ colId, idx }) =>
+        idx >= minCol && activeConfigs[colId]?.type !== "lookup",
+    )
+    .map(({ idx }) => idx);
+
+  const targetRows = visibleRowOrder.slice(minRow, minRow + rowsData.length);
+
+  const targetCells = isSingleValueToRange
+    ? visibleRowOrder
+        .slice(minRow, maxRow + 1)
+        .flatMap((rowId) =>
+          columnOrder
+            .slice(minCol, maxCol + 1)
+            .map((colId) => ({ rowId, colId, value: rowsData[0][0] })),
+        )
+    : targetRows.flatMap((rowId, rOffset) =>
+        rowsData[rOffset]
+          .slice(0, targetColIndices.length)
+          .map((value, cOffset) => ({
+            rowId,
+            colId: columnOrder[targetColIndices[cOffset]],
+            value,
+          })),
+      );
+
+  const hasChanges = targetCells.reduce(
+    (changed, cell) =>
+      tryOverwrite(cell.rowId, cell.colId, cell.value) || changed,
+    false,
   );
 
-  const newRowIds: RowId[] = [];
-  const newCellEdits: Record<string, string> = {};
-  const newRowStatuses: Record<RowId, RowStatus> = { ...currentRowStatuses };
+  if (
+    !isSingleValueToRange &&
+    targetRows.length > 0 &&
+    columnOrder.length > 0
+  ) {
+    const maxPastedRow = minRow + targetRows.length - 1;
+    const pastedColCount = rowsData.reduce(
+      (max, row) =>
+        Math.max(max, Math.min(row.length, targetColIndices.length)),
+      0,
+    );
+    const maxPastedCol =
+      pastedColCount > 0 ? targetColIndices[pastedColCount - 1] : minCol;
 
-  for (const rowData of rowsData) {
-    const rowId = createRowId();
-    newRowIds.push(rowId);
-    newRowStatuses[rowId] = "added";
-
-    rowData.forEach((value, index) => {
-      const colIndex = startCol + index;
-      if (colIndex < targetColumns.length) {
-        const colId = targetColumns[colIndex];
-        newCellEdits[`${rowId}-${colId}`] = value;
-      }
+    set(selectionAtom, {
+      start: { row: minRow, col: minCol },
+      end: {
+        row: Math.min(maxPastedRow, visibleRowOrder.length - 1),
+        col: Math.min(maxPastedCol, columnOrder.length - 1),
+      },
     });
   }
 
-  const newRowOrder = [...currentRowOrder];
-  newRowOrder.splice(insertIndex, 0, ...newRowIds);
-
-  set(rowOrderAtom, newRowOrder);
-  set(cellEditsAtom, {
-    ...currentEdits,
-    ...newCellEdits,
-  });
-  set(rowStatusesAtom, newRowStatuses);
+  if (hasChanges) {
+    set(cellEditsAtom, nextEdits);
+    set(rowStatusesAtom, nextRowStatuses);
+  }
 });
 
 export type ApplyColumnBindingPayload = {

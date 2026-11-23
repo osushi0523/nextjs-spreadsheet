@@ -2,13 +2,34 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 import {
   activeSheetModeAtom,
-  pasteRowsAtom,
+  pasteCellsAtom,
   workbookStatusAtom,
 } from "../stores";
 
+/**
+ * Excel 等からコピーされた TSV テキストを 2 次元配列へパースする。
+ * クォートされたセル内の改行・タブやエスケープされたクォート（""）にも対応し、
+ * 末尾の改行コード 1 つだけを除去して途中の空行は保持する。
+ */
+const ROW_PATTERN = /(?:^|\r?\n)((?:[^\r\n"]|"(?:[^"]|"")*")*)/g;
+const CELL_PATTERN = /(?:^|\t)(?:"((?:[^"]|"")*)"|([^\t]*))/g;
+
+const parseClipboardTsv = (text: string): string[][] => {
+  const normalized = text.replace(/\r?\n$/, "");
+  if (!normalized.includes('"')) {
+    return normalized.split(/\r?\n/).map((row) => row.split("\t"));
+  }
+
+  return Array.from(normalized.matchAll(ROW_PATTERN), ([, row]) =>
+    Array.from(row.matchAll(CELL_PATTERN), ([, quoted, plain]) =>
+      quoted !== undefined ? quoted.replaceAll('""', '"') : (plain ?? ""),
+    ),
+  );
+};
+
 export const useSheetClipboard = () => {
   const sheetMode = useAtomValue(activeSheetModeAtom);
-  const pasteRows = useSetAtom(pasteRowsAtom);
+  const pasteCells = useSetAtom(pasteCellsAtom);
   const setStatus = useSetAtom(workbookStatusAtom);
 
   useEffect(() => {
@@ -27,13 +48,10 @@ export const useSheetClipboard = () => {
       const text = event.clipboardData?.getData("text/plain");
       if (!text) return;
 
-      const rowsData = text
-        .split(/\r?\n/)
-        .filter((row) => row.length > 0)
-        .map((row) => row.split("\t"));
-
+      const rowsData = parseClipboardTsv(text);
       if (rowsData.length > 0) {
-        pasteRows(rowsData);
+        event.preventDefault();
+        pasteCells(rowsData);
       }
     };
 
@@ -41,7 +59,7 @@ export const useSheetClipboard = () => {
     return () => {
       window.removeEventListener("paste", handlePaste);
     };
-  }, [pasteRows, sheetMode]);
+  }, [pasteCells, sheetMode]);
 
   useEffect(() => {
     const handleMouseUp = () => {
