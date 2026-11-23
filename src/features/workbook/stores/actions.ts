@@ -322,9 +322,8 @@ const getCellBaseValue = (
 const isCellEditable = (
   colConfig: ColumnConfig | undefined,
   rowId: RowId,
-  rowStatuses: Record<RowId, RowStatus>,
 ): boolean => {
-  if (isSubtotalRowId(rowId) || rowStatuses[rowId] === "deleted") {
+  if (isSubtotalRowId(rowId)) {
     return false;
   }
   return !isColumnReadOnly(colConfig);
@@ -342,9 +341,11 @@ const applyCellEdit = (
   const currentValue = key in nextEdits ? nextEdits[key] : baseValue;
   if (currentValue === newValue) return false;
 
+  const currentStatus = nextRowStatuses[rowId] ?? "none";
+
   if (newValue !== baseValue) {
     nextEdits[key] = newValue;
-    if ((nextRowStatuses[rowId] ?? "none") === "none") {
+    if (currentStatus === "none" || currentStatus === "deleted") {
       nextRowStatuses[rowId] = "edited";
     }
     return true;
@@ -354,8 +355,12 @@ const applyCellEdit = (
   const hasOtherEditsInRow = Object.keys(nextEdits).some((k) =>
     k.startsWith(`${rowId}-`),
   );
-  if (!hasOtherEditsInRow && nextRowStatuses[rowId] === "edited") {
-    delete nextRowStatuses[rowId];
+  if (!hasOtherEditsInRow) {
+    if (currentStatus === "edited" || currentStatus === "deleted") {
+      delete nextRowStatuses[rowId];
+    }
+  } else if (currentStatus === "deleted") {
+    nextRowStatuses[rowId] = "edited";
   }
   return true;
 };
@@ -407,7 +412,7 @@ const applyPasteValues = (get: Getter, set: Setter, rowsData: string[][]) => {
     colId: ColumnId,
     newValue: string,
   ): boolean => {
-    if (!isCellEditable(activeConfigs[colId], rowId, currentRowStatuses)) {
+    if (!isCellEditable(activeConfigs[colId], rowId)) {
       return false;
     }
     const baseValue = getCellBaseValue(
@@ -579,7 +584,6 @@ const collectPasteMismatches = ({
   columnOrder,
   activeConfigs,
   columnNames,
-  rowStatuses,
 }: {
   sourceSheetId: string;
   activeSheetId: string;
@@ -589,7 +593,6 @@ const collectPasteMismatches = ({
   columnOrder: ColumnId[];
   activeConfigs: Record<ColumnId, ColumnConfig>;
   columnNames: Record<ColumnId, string>;
-  rowStatuses: Record<RowId, RowStatus>;
 }): PasteColumnMismatch[] => {
   const { minRow, maxRow, minCol, maxCol } = bounds;
   const isSameSheet = sourceSheetId === activeSheetId;
@@ -604,7 +607,7 @@ const collectPasteMismatches = ({
     sourceEntry: CopiedCellEntry | undefined,
   ) => {
     if (!rowId || !targetColId || !sourceEntry) return;
-    if (!isCellEditable(activeConfigs[targetColId], rowId, rowStatuses)) {
+    if (!isCellEditable(activeConfigs[targetColId], rowId)) {
       return;
     }
     if (isSameSheet && sourceEntry.sourceColId === targetColId) {
@@ -660,7 +663,6 @@ export const requestInternalPasteAtom = atom(null, (get, set) => {
   const columnOrder = get(columnOrderAtom);
   const activeConfigs = get(activeColumnConfigsAtom);
   const columnNames = get(columnNamesAtom);
-  const rowStatuses = get(rowStatusesAtom);
   const templates = get(sheetTemplatesAtom);
 
   const bounds = normalizeSelectionBounds(selection);
@@ -674,7 +676,6 @@ export const requestInternalPasteAtom = atom(null, (get, set) => {
     columnOrder,
     activeConfigs,
     columnNames,
-    rowStatuses,
   });
 
   if (mismatches.length > 0) {
@@ -1067,6 +1068,7 @@ export const clearSelectedCellsAtom = atom(null, (get, set) => {
   const visibleRowOrder = get(visibleRowOrderAtom);
   const columnOrder = get(columnOrderAtom);
   const configs = get(activeColumnConfigsAtom);
+  const activeSheetId = get(activeSheetIdAtom);
   const baseValues = get(baseCellValuesAtom);
   const currentEdits = get(cellEditsAtom);
   const currentRowStatuses = get(rowStatusesAtom);
@@ -1080,7 +1082,7 @@ export const clearSelectedCellsAtom = atom(null, (get, set) => {
 
   for (let r = minRow; r <= maxRow; r++) {
     const rowId = visibleRowOrder[r];
-    if (!rowId) continue;
+    if (!rowId || isSubtotalRowId(rowId)) continue;
 
     for (let c = minCol; c <= maxCol; c++) {
       const colId = columnOrder[c];
@@ -1091,16 +1093,17 @@ export const clearSelectedCellsAtom = atom(null, (get, set) => {
         continue;
       }
 
-      const key = `${rowId}-${colId}`;
-      const currentVal =
-        key in currentEdits ? currentEdits[key] : (baseValues[key] ?? "");
-
-      if (currentVal !== "") {
-        nextEdits[key] = "";
+      const baseValue = getCellBaseValue(
+        get,
+        rowId,
+        colId,
+        activeSheetId,
+        baseValues,
+      );
+      if (
+        applyCellEdit(nextEdits, nextRowStatuses, rowId, colId, baseValue, "")
+      ) {
         hasChanges = true;
-        if ((nextRowStatuses[rowId] ?? "none") === "none") {
-          nextRowStatuses[rowId] = "edited";
-        }
       }
     }
   }

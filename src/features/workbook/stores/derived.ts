@@ -213,6 +213,9 @@ export const cellFamily = atomFamily(
         const currentValue = edits[key] ?? baseValue;
         if (currentValue === newValue) return;
 
+        const rowStatuses = get(rowStatusesAtom);
+        const currentStatus = rowStatuses[address.rowId] ?? "none";
+
         // 元の値（baseValue）と同じ値に戻された場合は diff から除外
         if (newValue === baseValue) {
           const nextEdits = { ...edits };
@@ -223,22 +226,23 @@ export const cellFamily = atomFamily(
             k.startsWith(`${address.rowId}-`),
           );
           if (!hasOtherEditsInRow) {
-            const rowStatuses = get(rowStatusesAtom);
-            if (rowStatuses[address.rowId] === "edited") {
+            if (currentStatus === "edited" || currentStatus === "deleted") {
               const nextStatuses = { ...rowStatuses };
               delete nextStatuses[address.rowId];
               set(rowStatusesAtom, nextStatuses);
             }
+          } else if (currentStatus === "deleted") {
+            set(rowStatusesAtom, {
+              ...rowStatuses,
+              [address.rowId]: "edited",
+            });
           }
           return;
         }
 
         set(cellEditsAtom, { ...edits, [key]: newValue }); // 編集時はDiffのみ更新
 
-        const rowStatuses = get(rowStatusesAtom);
-        const currentStatus = rowStatuses[address.rowId] ?? "none";
-
-        if (currentStatus === "none") {
+        if (currentStatus === "none" || currentStatus === "deleted") {
           set(rowStatusesAtom, {
             ...rowStatuses,
             [address.rowId]: "edited",
