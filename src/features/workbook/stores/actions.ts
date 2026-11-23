@@ -1,7 +1,12 @@
 import { atom, type Getter } from "jotai";
 import { baseCellValuesAtom } from "./base";
 import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
-import { columnNamesAtom, columnOrderAtom, rowOrderAtom } from "./derived";
+import {
+  cellFamily,
+  columnNamesAtom,
+  columnOrderAtom,
+  rowOrderAtom,
+} from "./derived";
 import {
   cellCustomStatusesAtom,
   cellEditsAtom,
@@ -144,6 +149,49 @@ export const deleteRowAtom = atom(null, (get, set, rowId: RowId) => {
     [rowId]: "deleted",
   });
 });
+
+export const duplicateRowAtom = atom(
+  null,
+  (
+    get,
+    set,
+    { rowId, position }: { rowId: RowId; position: InsertPosition },
+  ) => {
+    const rowOrder = get(rowOrderAtom);
+    const rowIndex = rowOrder.indexOf(rowId);
+    if (rowIndex === -1) return;
+
+    const newId = createRowId();
+    const newRowOrder = [...rowOrder];
+    const insertIndex = position === "above" ? rowIndex : rowIndex + 1;
+    newRowOrder.splice(insertIndex, 0, newId);
+
+    const columnOrder = get(columnOrderAtom);
+    const configs = get(activeColumnConfigsAtom);
+    const copiedEdits: Record<string, string> = {};
+
+    for (const colId of columnOrder) {
+      const colConfig = configs[colId];
+      if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
+        continue;
+      }
+      const value = get(cellFamily({ rowId, colId }));
+      if (value !== "") {
+        copiedEdits[`${newId}-${colId}`] = value;
+      }
+    }
+
+    set(rowOrderAtom, newRowOrder);
+    set(cellEditsAtom, {
+      ...get(cellEditsAtom),
+      ...copiedEdits,
+    });
+    set(rowStatusesAtom, {
+      ...get(rowStatusesAtom),
+      [newId]: "added",
+    });
+  },
+);
 
 export const pasteRowsAtom = atom(null, (get, set, rowsData: string[][]) => {
   const columnOrder = get(columnOrderAtom);

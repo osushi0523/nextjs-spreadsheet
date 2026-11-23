@@ -3,6 +3,7 @@ import { type FC, memo, type ReactNode, useCallback } from "react";
 import {
   activeSheetModeAtom,
   deleteRowAtom,
+  duplicateRowAtom,
   type InsertPosition,
   insertRowAtom,
   isSubtotalRowId,
@@ -20,6 +21,7 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
   const rowStatuses = useAtomValue(rowStatusesAtom);
   const sheetMode = useAtomValue(activeSheetModeAtom);
   const insertRow = useSetAtom(insertRowAtom);
+  const duplicateRow = useSetAtom(duplicateRowAtom);
   const deleteRow = useSetAtom(deleteRowAtom);
 
   const isSubtotal = isSubtotalRowId(rowId);
@@ -36,6 +38,14 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
     [insertRow, isReadOnly, rowId],
   );
 
+  const handleDuplicateRow = useCallback(
+    (position: InsertPosition) => {
+      if (isReadOnly) return;
+      duplicateRow({ rowId, position });
+    },
+    [duplicateRow, isReadOnly, rowId],
+  );
+
   const handleDeleteRow = useCallback(() => {
     if (isReadOnly) return;
     deleteRow(rowId);
@@ -49,6 +59,7 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
         isSubtotal,
         isReadOnly,
         onInsertRow: handleInsertRow,
+        onDuplicateRow: handleDuplicateRow,
         onDeleteRow: handleDeleteRow,
       })}
     </>

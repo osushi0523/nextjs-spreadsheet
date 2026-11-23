@@ -32,8 +32,9 @@ const RowStatusMarker: FC<{ status?: RowStatusType }> = ({
 
 const RowActionMenu: FC<{
   onInsertRow: (position: InsertPosition) => void;
+  onDuplicateRow: (position: InsertPosition) => void;
   onDeleteRow: () => void;
-}> = ({ onInsertRow, onDeleteRow }) => {
+}> = ({ onInsertRow, onDuplicateRow, onDeleteRow }) => {
   const { t } = useI18n(localMessages);
 
   return (
@@ -56,6 +57,13 @@ const RowActionMenu: FC<{
           {t("insertBelow")}
         </DropdownMenu.Item>
         <DropdownMenu.Separator />
+        <DropdownMenu.Item onClick={() => onDuplicateRow("above")}>
+          {t("duplicateAbove")}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onClick={() => onDuplicateRow("below")}>
+          {t("duplicateBelow")}
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
         <DropdownMenu.Item color="red" onClick={onDeleteRow}>
           {t("deleteRow")}
         </DropdownMenu.Item>
@@ -70,6 +78,7 @@ export type RowStatusPresenterProps = {
   isSubtotal?: boolean;
   isReadOnly?: boolean;
   onInsertRow: (position: InsertPosition) => void;
+  onDuplicateRow: (position: InsertPosition) => void;
   onDeleteRow: () => void;
 };
 
@@ -78,6 +87,7 @@ export const RowStatusPresenter: FC<RowStatusPresenterProps> = ({
   isSubtotal,
   isReadOnly,
   onInsertRow,
+  onDuplicateRow,
   onDeleteRow,
 }) => {
   if (isSubtotal) {
@@ -96,7 +106,11 @@ export const RowStatusPresenter: FC<RowStatusPresenterProps> = ({
     <Flex align="center" width="100%" height="100%">
       <RowStatusMarker status={status} />
       {!isReadOnly && (
-        <RowActionMenu onInsertRow={onInsertRow} onDeleteRow={onDeleteRow} />
+        <RowActionMenu
+          onInsertRow={onInsertRow}
+          onDuplicateRow={onDuplicateRow}
+          onDeleteRow={onDeleteRow}
+        />
       )}
     </Flex>
   );
