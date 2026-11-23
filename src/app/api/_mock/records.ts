@@ -560,6 +560,7 @@ export const fetchMockSheetRecords = (
       const productionDatetime = `${productionDate} ${hour}:${minute}`;
 
       records.push({
+        record_id: `PV-${String(r + 1).padStart(5, "0")}`,
         type,
         category,
         year,

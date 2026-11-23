@@ -4,6 +4,7 @@ import {
   type ActiveCell,
   type ColumnConfig,
   type ColumnId,
+  isColumnReadOnly,
   isSubtotalRowId,
   type RowId,
   type Selection,
@@ -68,7 +69,7 @@ export const useSheetKeyboard = ({
       const colId = columnOrder[col];
       if (!colId) return false;
       const config = activeColumnConfigs[colId];
-      if (config?.type === "lookup" || config?.readOnly) {
+      if (isColumnReadOnly(config)) {
         return false;
       }
       ensureCellVisible(row, col);

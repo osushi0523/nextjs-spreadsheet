@@ -34,6 +34,14 @@ export const productionVolumeTemplate: SheetTemplateRaw = {
   defaultRowCount: 10000,
   columns: [
     {
+      field: "record_id",
+      headerName: { ja: "管理ID", en: "Record ID" },
+      type: { type: "text" },
+      width: 110,
+      readOnly: true,
+      align: "center",
+    },
+    {
       field: "type",
       headerName: { ja: "タイプ", en: "Type" },
       type: { type: "text" },

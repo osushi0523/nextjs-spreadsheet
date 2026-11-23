@@ -23,6 +23,7 @@ import {
   cellStatusFamily,
   columnOrderAtom,
   isCellEditingFamily,
+  isColumnReadOnly,
   isSubtotalRowId,
   type MoveDirection,
   moveSelectionAtom,
@@ -159,8 +160,9 @@ const CellInner: FC<InnerProps> = memo(
 
     const isSubtotal = isSubtotalRowId(rowId);
     const isLookup = config.type === "lookup";
+    const isReadOnlyColumn = isColumnReadOnly(config);
     const isReadOnly =
-      Boolean(config.readOnly) || sheetMode === "inquiry" || isSubtotal;
+      isReadOnlyColumn || sheetMode === "inquiry" || isSubtotal;
     const isPulldown = config.type === "pulldown";
     const isDatetimePicker = config.type === "datetime";
     const datetimeFormat = isDatetimePicker ? config.format : undefined;
@@ -269,6 +271,7 @@ const CellInner: FC<InnerProps> = memo(
           isEditing,
           isLookup,
           isReadOnly,
+          isReadOnlyColumn,
           isSubtotal,
           isPulldown,
           isDatetime: isDatetimePicker,
@@ -289,6 +292,7 @@ const CellInner: FC<InnerProps> = memo(
         cellStatusInfo,
         isLookup,
         isReadOnly,
+        isReadOnlyColumn,
         isSubtotal,
         isPulldown,
         isDatetimePicker,

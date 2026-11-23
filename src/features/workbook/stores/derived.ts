@@ -14,6 +14,7 @@ import {
 import {
   activeColumnConfigsAtom,
   getLookupValue,
+  isColumnReadOnly,
   referencedSheetsDataAtom,
 } from "./binding";
 import {
@@ -192,7 +193,7 @@ export const cellFamily = atomFamily(
         // Lookup or readOnly column is read-only
         const configs = get(activeColumnConfigsAtom);
         const colConfig = configs[address.colId];
-        if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
+        if (isColumnReadOnly(colConfig)) {
           return;
         }
 

@@ -36,6 +36,7 @@ export type CellPresenterProps = {
   isEditing: boolean;
   isLookup?: boolean;
   isReadOnly?: boolean;
+  isReadOnlyColumn?: boolean;
   isSubtotal?: boolean;
   isPulldown?: boolean;
   isDatetime?: boolean;
@@ -74,6 +75,7 @@ export const CellPresenter: FC<CellPresenterProps> = ({
   isEditing,
   isLookup,
   isReadOnly,
+  isReadOnlyColumn,
   isSubtotal,
   isPulldown,
   isDatetime,
@@ -120,7 +122,10 @@ export const CellPresenter: FC<CellPresenterProps> = ({
         status === "validating" && styles["cell--validating"],
         isLookup && styles["cell--lookup"],
         isSubtotal && styles["cell--subtotal"],
-        isReadOnly && !isSubtotal && !isLookup && styles["cell--readonly"],
+        isReadOnlyColumn &&
+          !isSubtotal &&
+          !isLookup &&
+          styles["cell--readonly"],
         isPulldown && !isReadOnly && !isSubtotal && styles["cell--pulldown"],
       )}
     >

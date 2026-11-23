@@ -1,7 +1,11 @@
 import { atom, type Getter, type Setter } from "jotai";
 import { sheetRecordsQuery } from "../services/sheetRecords/sheetRecords.query";
 import { baseCellValuesAtom } from "./base";
-import { activeColumnConfigsAtom, columnConfigsAtom } from "./binding";
+import {
+  activeColumnConfigsAtom,
+  columnConfigsAtom,
+  isColumnReadOnly,
+} from "./binding";
 import {
   cellFamily,
   columnNamesAtom,
@@ -73,7 +77,7 @@ const pickPrefillValue = (
  * 列が穴埋め入力の対象かを判定するガード
  */
 const isPrefillableColumn = (config?: ColumnConfig): boolean =>
-  config?.type !== "lookup" && !config?.readOnly;
+  !isColumnReadOnly(config);
 
 /**
  * 新規行に対してアクティブなフィルター条件から穴埋めする編集差分を生成
@@ -187,7 +191,7 @@ export const duplicateRowAtom = atom(
 
     for (const colId of columnOrder) {
       const colConfig = configs[colId];
-      if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
+      if (isColumnReadOnly(colConfig)) {
         continue;
       }
       const value = get(cellFamily({ rowId, colId }));
@@ -234,7 +238,7 @@ const isCellEditable = (
   if (isSubtotalRowId(rowId) || rowStatuses[rowId] === "deleted") {
     return false;
   }
-  return !(colConfig?.type === "lookup" || colConfig?.readOnly);
+  return !isColumnReadOnly(colConfig);
 };
 
 const applyCellEdit = (
@@ -648,6 +652,11 @@ export const applyColumnBindingAtom = atom(
     const activeSheetId = get(activeSheetIdAtom);
     if (!activeSheetId) return;
 
+    const activeConfigs = get(activeColumnConfigsAtom);
+    if (isColumnReadOnly(activeConfigs[targetColId])) {
+      return;
+    }
+
     const currentOrders = get(columnOrderAtom);
     const colConfigs = { ...(get(columnConfigsAtom)[activeSheetId] ?? {}) };
 
@@ -688,6 +697,7 @@ export const applyColumnBindingAtom = atom(
 
       colConfigs[newColId] = {
         type: "lookup",
+        readOnly: true,
         lookup: {
           parentColId: targetColId,
           sourceSheetId,
@@ -988,7 +998,7 @@ export const clearSelectedCellsAtom = atom(null, (get, set) => {
       if (!colId) continue;
 
       const colConfig = configs[colId];
-      if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
+      if (isColumnReadOnly(colConfig)) {
         continue;
       }
 

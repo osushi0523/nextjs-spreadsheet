@@ -53,6 +53,8 @@
 }
 
 .cell--readonly {
+  background-color: var(--gray-3);
+  color: var(--gray-11);
   cursor: default;
 }
 

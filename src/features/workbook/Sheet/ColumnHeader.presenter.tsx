@@ -14,6 +14,7 @@ export type ColumnHeaderPresenterProps = {
   col: AxisLayout;
   colId: ColumnId | null;
   config?: ColumnConfig;
+  isReadOnlyColumn?: boolean;
   isFiltered: boolean;
   isFilterable?: boolean;
   hasTotal: boolean;
@@ -38,6 +39,7 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
   col,
   colId,
   config,
+  isReadOnlyColumn,
   isFiltered,
   isFilterable = true,
   hasTotal,
@@ -169,7 +171,15 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
                 </>
               )}
 
-              {config?.type === "pulldown" ? (
+              {config?.type === "lookup" ? (
+                <DropdownMenu.Item
+                  onSelect={() =>
+                    onOpenSettingModal?.(config.lookup.parentColId)
+                  }
+                >
+                  {t("editParentColumn")}
+                </DropdownMenu.Item>
+              ) : isReadOnlyColumn ? null : config?.type === "pulldown" ? (
                 <>
                   <DropdownMenu.Item
                     onSelect={() => colId && onOpenSettingModal?.(colId)}
@@ -184,14 +194,6 @@ export const ColumnHeaderPresenter: FC<ColumnHeaderPresenterProps> = ({
                     {t("removePulldown")}
                   </DropdownMenu.Item>
                 </>
-              ) : config?.type === "lookup" ? (
-                <DropdownMenu.Item
-                  onSelect={() =>
-                    onOpenSettingModal?.(config.lookup.parentColId)
-                  }
-                >
-                  {t("editParentColumn")}
-                </DropdownMenu.Item>
               ) : (
                 <DropdownMenu.Item
                   onSelect={() => colId && onOpenSettingModal?.(colId)}

@@ -47,6 +47,12 @@ export const referencedSheetsDataAtom = atom<Record<string, SheetData>>(
 const EMPTY_CONFIGS: Record<ColumnId, ColumnConfig> = {};
 
 /**
+ * 列設定が読み取り専用（lookup 列またはサーバー指定の readOnly 列）かを判定する
+ */
+export const isColumnReadOnly = (config?: ColumnConfig): boolean =>
+  Boolean(config && (config.type === "lookup" || config.readOnly));
+
+/**
  * テンプレート定義から静的な列設定マップを生成するヘルパー関数
  */
 export const buildConfigsFromTemplate = (

@@ -8,6 +8,7 @@ import {
   activeColumnTotalsAtom,
   activeSheetIdAtom,
   isColumnId,
+  isColumnReadOnly,
   sheetTemplatesAtom,
 } from "../stores";
 import type { ColumnHeaderPresenterProps } from "./ColumnHeader.presenter";
@@ -37,6 +38,7 @@ export const ColumnHeaderContainer: FC<Props> = ({
   const colId = isColumnId(col.id) ? col.id : null;
   const config = colId ? configs[colId] : undefined;
   const isLookup = config?.type === "lookup";
+  const isReadOnlyColumn = isColumnReadOnly(config);
 
   const template = activeSheetId ? templates[activeSheetId] : undefined;
   const isFilterable = template?.filters
@@ -71,6 +73,7 @@ export const ColumnHeaderContainer: FC<Props> = ({
         col,
         colId,
         config,
+        isReadOnlyColumn,
         isFiltered,
         isFilterable,
         hasTotal,
