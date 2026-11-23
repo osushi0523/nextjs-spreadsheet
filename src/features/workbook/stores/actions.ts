@@ -46,7 +46,11 @@ import {
   pendingPasteConfirmationAtom,
   selectionAtom,
 } from "./ui";
-import { asyncValidationErrorsAtom } from "./validation";
+import {
+  asyncValidationControllers,
+  asyncValidationErrorsAtom,
+  validatingCellsAtom,
+} from "./validation";
 
 export const resetRowStatusesAtom = atom(null, (get, set) => {
   const activeRowIds = get(rowOrderAtom);
@@ -166,6 +170,91 @@ export const deleteRowAtom = atom(null, (get, set, rowId: RowId) => {
     ...rowStatuses,
     [rowId]: "deleted",
   });
+  set(internalClipboardAtom, null);
+});
+
+const filterOutRowKeys = <T>(
+  record: Record<string, T>,
+  rowPrefix: string,
+): { next: Record<string, T>; changed: boolean } => {
+  let changed = false;
+  const next: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key.startsWith(rowPrefix)) {
+      changed = true;
+    } else {
+      next[key] = value;
+    }
+  }
+  return { next, changed };
+};
+
+/**
+ * 行単位で編集・削除などの変更差分および関連エラーを破棄し、修正前の状態へ戻す
+ */
+export const revertRowAtom = atom(null, (get, set, rowId: RowId) => {
+  if (isSubtotalRowId(rowId)) return;
+
+  const rowStatuses = get(rowStatusesAtom);
+  const currentStatus = rowStatuses[rowId] ?? "none";
+  if (currentStatus === "none") return;
+
+  const rowPrefix = `${rowId}-`;
+
+  const editsResult = filterOutRowKeys(get(cellEditsAtom), rowPrefix);
+  if (editsResult.changed) {
+    set(cellEditsAtom, editsResult.next);
+  }
+
+  const customResult = filterOutRowKeys(get(cellCustomStatusesAtom), rowPrefix);
+  if (customResult.changed) {
+    set(cellCustomStatusesAtom, customResult.next);
+  }
+
+  const asyncErrResult = filterOutRowKeys(
+    get(asyncValidationErrorsAtom),
+    rowPrefix,
+  );
+  if (asyncErrResult.changed) {
+    set(asyncValidationErrorsAtom, asyncErrResult.next);
+  }
+
+  const touched = get(touchedCellsAtom);
+  const nextTouched = new Set(
+    Array.from(touched).filter((k) => !k.startsWith(rowPrefix)),
+  );
+  if (nextTouched.size !== touched.size) {
+    set(touchedCellsAtom, nextTouched);
+  }
+
+  const validating = get(validatingCellsAtom);
+  let validatingChanged = false;
+  const nextValidating = new Set(validating);
+  for (const key of validating) {
+    if (key.startsWith(rowPrefix)) {
+      asyncValidationControllers.get(key)?.abort();
+      asyncValidationControllers.delete(key);
+      nextValidating.delete(key);
+      validatingChanged = true;
+    }
+  }
+  if (validatingChanged) {
+    set(validatingCellsAtom, nextValidating);
+  }
+
+  // 新規追加行（既存レコード由来でない行）を戻す場合は行リストからも除外する
+  const activeSheetId = get(activeSheetIdAtom);
+  const isNewRow =
+    currentStatus === "added" ||
+    (activeSheetId !== null && parseRowIndex(rowId, activeSheetId) === null);
+  if (isNewRow) {
+    set(rowOrderAtom, (prev) => prev.filter((id) => id !== rowId));
+  }
+
+  const nextStatuses = { ...rowStatuses };
+  delete nextStatuses[rowId];
+  set(rowStatusesAtom, nextStatuses);
+
   set(internalClipboardAtom, null);
 });
 

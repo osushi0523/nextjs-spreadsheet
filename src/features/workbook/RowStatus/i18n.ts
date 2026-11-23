@@ -10,6 +10,7 @@ export const localMessages = {
     duplicateAbove: "上に行を複製",
     duplicateBelow: "下に行を複製",
     deleteRow: "行を削除",
+    revertRow: "変更を元に戻す",
   },
   en: {
     statusAdded: "Added",
@@ -22,5 +23,6 @@ export const localMessages = {
     duplicateAbove: "Duplicate row above",
     duplicateBelow: "Duplicate row below",
     deleteRow: "Delete row",
+    revertRow: "Revert row",
   },
 } as const;

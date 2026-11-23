@@ -8,6 +8,7 @@ import {
   insertRowAtom,
   isSubtotalRowId,
   type RowId,
+  revertRowAtom,
   rowStatusesAtom,
 } from "../stores";
 import type { RowStatusPresenterProps } from "./RowStatus.presenter";
@@ -23,6 +24,7 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
   const insertRow = useSetAtom(insertRowAtom);
   const duplicateRow = useSetAtom(duplicateRowAtom);
   const deleteRow = useSetAtom(deleteRowAtom);
+  const revertRow = useSetAtom(revertRowAtom);
 
   const isSubtotal = isSubtotalRowId(rowId);
   const isReadOnly = sheetMode === "inquiry" || isSubtotal;
@@ -51,6 +53,11 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
     deleteRow(rowId);
   }, [deleteRow, isReadOnly, rowId]);
 
+  const handleRevertRow = useCallback(() => {
+    if (isReadOnly) return;
+    revertRow(rowId);
+  }, [isReadOnly, revertRow, rowId]);
+
   return (
     <>
       {children({
@@ -61,6 +68,7 @@ export const RowStatusContainer: FC<Props> = memo(({ rowId, children }) => {
         onInsertRow: handleInsertRow,
         onDuplicateRow: handleDuplicateRow,
         onDeleteRow: handleDeleteRow,
+        onRevertRow: handleRevertRow,
       })}
     </>
   );

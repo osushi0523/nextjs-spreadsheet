@@ -31,10 +31,12 @@ const RowStatusMarker: FC<{ status?: RowStatusType }> = ({
 };
 
 const RowActionMenu: FC<{
+  status: RowStatusType;
   onInsertRow: (position: InsertPosition) => void;
   onDuplicateRow: (position: InsertPosition) => void;
   onDeleteRow: () => void;
-}> = ({ onInsertRow, onDuplicateRow, onDeleteRow }) => {
+  onRevertRow: () => void;
+}> = ({ status, onInsertRow, onDuplicateRow, onDeleteRow, onRevertRow }) => {
   const { t } = useI18n(localMessages);
 
   return (
@@ -64,9 +66,16 @@ const RowActionMenu: FC<{
           {t("duplicateBelow")}
         </DropdownMenu.Item>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item color="red" onClick={onDeleteRow}>
-          {t("deleteRow")}
-        </DropdownMenu.Item>
+        {status !== "none" && (
+          <DropdownMenu.Item onClick={onRevertRow}>
+            {t("revertRow")}
+          </DropdownMenu.Item>
+        )}
+        {status !== "deleted" && (
+          <DropdownMenu.Item color="red" onClick={onDeleteRow}>
+            {t("deleteRow")}
+          </DropdownMenu.Item>
+        )}
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   );
@@ -80,6 +89,7 @@ export type RowStatusPresenterProps = {
   onInsertRow: (position: InsertPosition) => void;
   onDuplicateRow: (position: InsertPosition) => void;
   onDeleteRow: () => void;
+  onRevertRow: () => void;
 };
 
 export const RowStatusPresenter: FC<RowStatusPresenterProps> = ({
@@ -89,6 +99,7 @@ export const RowStatusPresenter: FC<RowStatusPresenterProps> = ({
   onInsertRow,
   onDuplicateRow,
   onDeleteRow,
+  onRevertRow,
 }) => {
   if (isSubtotal) {
     return (
@@ -107,9 +118,11 @@ export const RowStatusPresenter: FC<RowStatusPresenterProps> = ({
       <RowStatusMarker status={status} />
       {!isReadOnly && (
         <RowActionMenu
+          status={status}
           onInsertRow={onInsertRow}
           onDuplicateRow={onDuplicateRow}
           onDeleteRow={onDeleteRow}
+          onRevertRow={onRevertRow}
         />
       )}
     </Flex>
