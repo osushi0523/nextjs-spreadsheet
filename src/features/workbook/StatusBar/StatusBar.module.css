@@ -1,0 +1,63 @@
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 16px;
+  background-color: var(--gray-2);
+  border-top: 1px solid var(--gray-4);
+  font-size: 12px;
+  color: var(--gray-11);
+  user-select: none;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.statusGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.statusItemActive {
+  color: var(--gray-12);
+  font-weight: 500;
+}
+
+.marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.added {
+  background-color: var(--green-9);
+}
+
+.edited {
+  background-color: var(--amber-9);
+}
+
+.deleted {
+  background-color: var(--red-9);
+}
+
+.separator {
+  width: 1px;
+  height: 14px;
+  background-color: var(--gray-6);
+}
+
+.rowCount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--gray-12);
+}

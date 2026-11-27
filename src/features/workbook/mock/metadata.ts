@@ -18,13 +18,18 @@ export const productionVolumeTemplate: SheetTemplate = {
   name: "生産量登録",
   category: "planning",
   description: "生産量および上がり数量の実績・計画登録シート",
+  isFavorite: true,
   defaultRowCount: 10000,
   columns: [
     {
       field: "type",
       headerName: "タイプ",
       type: { type: "text" },
-      validations: [{ type: "required" }, { type: "string" }],
+      validations: [
+        { type: "required" },
+        { type: "string" },
+        { type: "custom", name: "server:validateProductionType" },
+      ],
       width: 120,
       align: "left",
     },
@@ -32,21 +37,59 @@ export const productionVolumeTemplate: SheetTemplate = {
       field: "category",
       headerName: "データ種別",
       type: { type: "text" },
-      validations: [{ type: "required" }],
+      validations: [
+        { type: "custom", name: "production-volume:requireCategoryIfSpecial" },
+      ],
       width: 140,
       align: "left",
     },
     {
       field: "year",
       headerName: "年度",
-      type: { type: "text" },
+      type: { type: "datetime", format: "yyyy" },
+      validations: [{ type: "required" }, { type: "datetime", format: "yyyy" }],
+      width: 100,
+      align: "center",
+    },
+    {
+      field: "month",
+      headerName: "対象月",
+      type: { type: "datetime", format: "MM" },
+      validations: [{ type: "required" }, { type: "datetime", format: "MM" }],
+      width: 90,
+      align: "center",
+    },
+    {
+      field: "production_year_month",
+      headerName: "生産年月",
+      type: { type: "datetime", format: "yyyy-MM" },
       validations: [
         { type: "required" },
-        { type: "numeric" },
-        { type: "minLength", length: 4 },
-        { type: "maxLength", length: 4 },
+        { type: "datetime", format: "yyyy-MM" },
       ],
-      width: 100,
+      width: 110,
+      align: "center",
+    },
+    {
+      field: "production_date",
+      headerName: "生産日",
+      type: { type: "datetime", format: "yyyy-MM-dd" },
+      validations: [
+        { type: "required" },
+        { type: "datetime", format: "yyyy-MM-dd" },
+      ],
+      width: 130,
+      align: "center",
+    },
+    {
+      field: "production_datetime",
+      headerName: "生産日時",
+      type: { type: "datetime", format: "yyyy-MM-dd HH:mm" },
+      validations: [
+        { type: "required" },
+        { type: "datetime", format: "yyyy-MM-dd HH:mm" },
+      ],
+      width: 165,
       align: "center",
     },
     {
@@ -123,6 +166,11 @@ export const productionVolumeTemplate: SheetTemplate = {
         mode: "combobox",
         sourceTemplateId: "cost-department-master",
         sourceKeyField: "code",
+        relation: {
+          parentField: "office_code",
+          targetSheetId: "cost-department-master",
+          sourceFilterField: "office_code",
+        },
         lookupFields: [
           {
             field: "cost_dept_name",
@@ -178,6 +226,17 @@ export const productionVolumeTemplate: SheetTemplate = {
       align: "right",
     },
   ],
+  filters: [
+    { field: "accounting_unit_code", required: true, selectionType: "single" },
+    { field: "office_code", required: true, selectionType: "single" },
+    {
+      field: "production_year_month",
+      required: false,
+      selectionType: "multiple",
+    },
+    { field: "cost_dept_code", required: false, selectionType: "multiple" },
+    { field: "cost_spec", required: false, selectionType: "multiple" },
+  ],
 };
 
 export const accountingUnitTemplate: SheetTemplate = {
@@ -185,6 +244,7 @@ export const accountingUnitTemplate: SheetTemplate = {
   name: "会計単位",
   category: "master",
   description: "会計単位（部署・部門）のマスタシート",
+  isFavorite: false,
   defaultRowCount: 11,
   columns: [
     {
@@ -211,13 +271,18 @@ export const officeTemplate: SheetTemplate = {
   name: "事業所",
   category: "master",
   description: "全国事業所のマスタシート",
+  isFavorite: false,
   defaultRowCount: 47,
   columns: [
     {
       field: "code",
       headerName: "事業所コード",
       type: { type: "text" },
-      validations: [{ type: "required" }, { type: "alphanumeric" }],
+      validations: [
+        { type: "required" },
+        { type: "alphanumeric" },
+        { type: "unique" },
+      ],
       width: 140,
       align: "left",
     },
@@ -237,8 +302,17 @@ export const costDepartmentTemplate: SheetTemplate = {
   name: "原価部門マスタ",
   category: "master",
   description: "原価部門および製造課のマスタシート",
+  isFavorite: false,
   defaultRowCount: 11,
   columns: [
+    {
+      field: "office_code",
+      headerName: "事業所コード",
+      type: { type: "text" },
+      validations: [{ type: "required" }, { type: "alphanumeric" }],
+      width: 140,
+      align: "left",
+    },
     {
       field: "code",
       headerName: "原価部門コード",
@@ -318,4 +392,12 @@ export const MOCK_SHEET_TEMPLATES: Record<string, SheetTemplate> = {
   [productMasterTemplate.id]: productMasterTemplate,
 };
 
-export const MOCK_INITIAL_OPEN_SHEET_IDS: string[] = [];
+export const MOCK_INITIAL_OPEN_SHEET_IDS: string[] = [
+  productionVolumeTemplate.id,
+];
+
+export const MOCK_FAVORITE_SHEET_IDS: string[] = Object.values(
+  MOCK_SHEET_TEMPLATES,
+)
+  .filter((template) => template.isFavorite)
+  .map((template) => template.id);

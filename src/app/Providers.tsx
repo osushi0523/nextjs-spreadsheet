@@ -13,7 +13,7 @@ export const Providers: FC<Props> = ({ children }) => {
   return (
     <NextThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <Theme
-        accentColor="brown"
+        accentColor="blue"
         grayColor="gray"
         radius="large"
         className={styles.theme}

@@ -1,0 +1,53 @@
+export const drawerMessages = {
+  ja: {
+    sheetMenuTitle: "シートメニュー",
+    mainMenu: "メインメニュー",
+    favoritesSection: "よく使う項目",
+    noFavoriteSheets: "シートをお気に入り登録するとここに表示されます",
+    addToFavorites: "{name} をお気に入りに追加",
+    removeFromFavorites: "{name} をお気に入りから解除",
+    categoriesSection: "カテゴリー",
+    searchResults: "検索結果",
+    searchPlaceholder: "シートを検索...",
+    allCategories: "すべて",
+    noSheetsFound: "該当するシートが見つかりませんでした",
+    openStatus: "開いています",
+    activeStatus: "編集中",
+    categoryMaster: "マスタ管理",
+    categoryPlanning: "計画・実績",
+    categoryOther: "その他",
+    totalSheets: "{count}件のシート",
+    closeDrawer: "閉じる",
+  },
+  en: {
+    sheetMenuTitle: "Sheet Menu",
+    mainMenu: "Main Menu",
+    favoritesSection: "Frequently Used",
+    noFavoriteSheets: "Favorite sheets will appear here",
+    addToFavorites: "Add {name} to favorites",
+    removeFromFavorites: "Remove {name} from favorites",
+    categoriesSection: "Categories",
+    searchResults: "Search Results",
+    searchPlaceholder: "Search sheets...",
+    allCategories: "All",
+    noSheetsFound: "No sheets found",
+    openStatus: "Opened",
+    activeStatus: "Active",
+    categoryMaster: "Master Management",
+    categoryPlanning: "Planning & Actuals",
+    categoryOther: "Other",
+    totalSheets: "{count} sheets",
+    closeDrawer: "Close",
+  },
+} as const;
+
+export const getCategoryLabel = (
+  categoryId: string,
+  fallbackName: string,
+  t: (key: "categoryMaster" | "categoryPlanning" | "categoryOther") => string,
+): string => {
+  if (categoryId === "master") return t("categoryMaster");
+  if (categoryId === "planning") return t("categoryPlanning");
+  if (categoryId === "other") return t("categoryOther");
+  return fallbackName;
+};

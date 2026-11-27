@@ -1,12 +1,27 @@
 import { atom } from "jotai";
-import type { ColumnId, Selection, ViewMode, WorkbookStatus } from "./types";
+import type {
+  ActiveCell,
+  ColumnId,
+  InternalClipboardState,
+  PendingPasteConfirmation,
+  Selection,
+  ViewMode,
+  WorkbookStatus,
+} from "./types";
 
 export const workbookStatusAtom = atom<WorkbookStatus>("idle");
-export const activeCellAtom = atom<{ row: number; col: number } | null>(null);
+export const activeCellAtom = atom<ActiveCell>(null);
 export const selectionAtom = atom<Selection>(null);
+export const internalClipboardAtom = atom<InternalClipboardState>(null);
+export const pendingPasteConfirmationAtom =
+  atom<PendingPasteConfirmation>(null);
 
-// --- UI State ---
+// --- UI State (純粋な UI 状態として管理。初期値フォールバックはコンテナ層で行う) ---
+export const openSheetIdsAtom = atom<string[] | null>(null);
 export const activeSheetIdAtom = atom<string | null>(null);
+export const favoriteSheetIdsAtom = atom<string[] | null>(null);
+
 export const viewModeAtom = atom<ViewMode>("editor");
 export const pdfPreviewUrlAtom = atom<string | null>(null);
+export const pdfPreviewTypeAtom = atom<"table" | "report">("table");
 export const columnWidthOverridesAtom = atom<Record<ColumnId, number>>({});

@@ -1,7 +1,8 @@
 import { z } from "zod";
+import type { I18nString } from "@/i18n/types";
 
-export const RowIdSchema = z.uuid().brand<"RowId">();
-export const ColumnIdSchema = z.uuid().brand<"ColumnId">();
+export const RowIdSchema = z.string().min(1).brand<"RowId">();
+export const ColumnIdSchema = z.string().min(1).brand<"ColumnId">();
 
 export type RowId = z.infer<typeof RowIdSchema>;
 export type ColumnId = z.infer<typeof ColumnIdSchema>;
@@ -9,10 +10,30 @@ export type ColumnId = z.infer<typeof ColumnIdSchema>;
 export const createRowId = () => RowIdSchema.parse(crypto.randomUUID());
 export const createColumnId = () => ColumnIdSchema.parse(crypto.randomUUID());
 
+export const createRecordRowId = (sheetId: string, index: number): RowId =>
+  RowIdSchema.parse(`${sheetId}-r${index}`);
+
+export const createSubtotalRowId = (groupId: string): RowId =>
+  RowIdSchema.parse(`subtotal-${groupId}`);
+
+export const isSubtotalRowId = (rowId: RowId): boolean =>
+  rowId.startsWith("subtotal-");
+
+export const parseRowIndex = (rowId: RowId, sheetId: string): number | null => {
+  const prefix = `${sheetId}-r`;
+  if (rowId.startsWith(prefix)) {
+    const num = Number.parseInt(rowId.slice(prefix.length), 10);
+    return Number.isNaN(num) ? null : num;
+  }
+  return null;
+};
+
 export const isRowId = (id: unknown): id is RowId =>
   RowIdSchema.safeParse(id).success;
 export const isColumnId = (id: unknown): id is ColumnId =>
   ColumnIdSchema.safeParse(id).success;
+
+import type { CustomValidatorName } from "../validators/names";
 
 export type CellAddress = {
   rowId: RowId;
@@ -24,9 +45,28 @@ export type Selection = {
   end: { row: number; col: number };
 } | null;
 
+export type ActiveCell = {
+  row: number;
+  col: number;
+  initialValue?: string;
+} | null;
+
+export type MoveDirection = {
+  deltaRow: number;
+  deltaCol: number;
+};
+
 export type WorkbookStatus = "idle" | "selecting" | "editing";
 export type RowStatus = "added" | "edited" | "deleted" | "none";
-export type CellStatus = "none" | "edited" | "error";
+export type CellStatus = "none" | "edited" | "error" | "validating";
+export type DateTimeFormat =
+  | "yyyy-MM-dd"
+  | "yyyy-MM-dd HH:mm"
+  | "yyyy-MM-dd hh:mm"
+  | "yyyy-MM"
+  | "yyyy"
+  | "MM";
+
 export type ValidationErrorKey =
   | "required"
   | "number"
@@ -37,6 +77,9 @@ export type ValidationErrorKey =
   | "maxLength"
   | "minLength"
   | "reference"
+  | "referenceRelation"
+  | "datetime"
+  | "unique"
   | "invalid";
 
 export type ValidationErrorInfo = {
@@ -62,11 +105,22 @@ export type LookupColumnDefinition = {
   sourceColName?: string;
 };
 
+export type ColumnRelation = {
+  parentField: string;
+  targetSheetId?: string;
+  sourceFilterField: string;
+};
+
 export type PulldownBinding = {
   sourceSheetId: string;
   sourceKeyColId: ColumnId;
   lookupColumns: LookupColumnDefinition[];
   mode: PulldownMode;
+  relation?: {
+    parentColId: ColumnId;
+    targetSheetId: string;
+    sourceFilterColId: ColumnId;
+  };
 };
 
 export type LookupBinding = {
@@ -77,6 +131,7 @@ export type LookupBinding = {
 
 export type ColumnConfig =
   | { type: "default"; readOnly?: boolean }
+  | { type: "datetime"; format: DateTimeFormat; readOnly?: boolean }
   | { type: "pulldown"; pulldown: PulldownBinding; readOnly?: boolean }
   | { type: "lookup"; lookup: LookupBinding; readOnly?: boolean };
 
@@ -104,16 +159,21 @@ export type ColumnValidationRule =
   | { type: "numeric" }
   | { type: "maxLength"; length: number }
   | { type: "minLength"; length: number }
-  | { type: "reference" };
+  | { type: "reference" }
+  | { type: "datetime"; format: DateTimeFormat }
+  | { type: "unique" }
+  | { type: "custom"; name: CustomValidatorName; options?: unknown };
 
 export type ColumnTemplateType =
   | { type: "text" }
   | { type: "number"; format?: "currency" | "integer" | "decimal" }
+  | { type: "datetime"; format: DateTimeFormat }
   | {
       type: "pulldown";
       mode: "dropdown" | "combobox";
       sourceTemplateId: string;
       sourceKeyField: string;
+      relation?: ColumnRelation;
       lookupFields: {
         field: string;
         headerName: string;
@@ -138,10 +198,33 @@ export type ColumnTemplate = {
   align?: "left" | "center" | "right";
 };
 
+export type SheetFilterDefinition = {
+  field: string;
+  label?: string;
+  required?: boolean;
+  selectionType: "single" | "multiple";
+};
+
 export type SheetCategory = {
   id: string;
   name: string;
   description?: string;
+};
+
+export type SheetMode = "edit" | "inquiry";
+
+export type SubtotalAggregationType = "sum" | "avg" | "blank";
+
+export type SubtotalConfig = {
+  enabled: boolean;
+  /** グルーピングのキーとなるフィールド一覧（「年度」から「受払区分」まで） */
+  groupByKeys: string[];
+  /** 小計ラベル（例: （計））を表示するカラムのfield */
+  labelField: string;
+  /** 小計行に表示するラベル文字列 (デフォルト: "（計）") */
+  labelPattern?: string;
+  /** 各数値列の集計種別 ("sum" | "blank") */
+  aggregations: Record<string, SubtotalAggregationType>;
 };
 
 export type SheetTemplate = {
@@ -149,6 +232,112 @@ export type SheetTemplate = {
   name: string;
   category: string;
   description?: string;
+  isFavorite?: boolean;
   columns: ColumnTemplate[];
   defaultRowCount?: number;
+  subtotalConfig?: SubtotalConfig;
+  filters?: SheetFilterDefinition[];
 };
+
+// --- Raw Types (API レスポンスに含まれる多言語生データ型) ---
+
+export type SheetFilterDefinitionRaw = {
+  field: string;
+  label?: I18nString;
+  required?: boolean;
+  selectionType: "single" | "multiple";
+};
+
+export type ColumnTemplateTypeRaw =
+  | { type: "text" }
+  | { type: "number"; format?: "currency" | "integer" | "decimal" }
+  | { type: "datetime"; format: DateTimeFormat }
+  | {
+      type: "pulldown";
+      mode: "dropdown" | "combobox";
+      sourceTemplateId: string;
+      sourceKeyField: string;
+      relation?: ColumnRelation;
+      lookupFields: {
+        field: string;
+        headerName: I18nString;
+        sourceField: string;
+      }[];
+    }
+  | {
+      type: "lookup";
+      parentField: string;
+      sourceTemplateId: string;
+      sourceField: string;
+    };
+
+export type ColumnTemplateRaw = {
+  field: string;
+  headerName: I18nString;
+  type: ColumnTemplateTypeRaw;
+  validations?: ColumnValidationRule[];
+  width?: number;
+  hasTotal?: boolean;
+  readOnly?: boolean;
+  align?: "left" | "center" | "right";
+};
+
+export type SheetCategoryRaw = {
+  id: string;
+  name: I18nString;
+  description?: I18nString;
+};
+
+export type SubtotalConfigRaw = {
+  enabled: boolean;
+  groupByKeys: string[];
+  labelField: string;
+  labelPattern?: I18nString;
+  aggregations: Record<string, SubtotalAggregationType>;
+};
+
+export type SheetTemplateRaw = {
+  id: string;
+  name: I18nString;
+  category: string;
+  description?: I18nString;
+  isFavorite?: boolean;
+  columns: ColumnTemplateRaw[];
+  defaultRowCount?: number;
+  subtotalConfig?: SubtotalConfigRaw;
+  filters?: SheetFilterDefinitionRaw[];
+};
+
+export type CopiedCellEntry = {
+  value: string;
+  sourceColId: ColumnId;
+  sourceColName: string;
+};
+
+export type CopySourceRange = {
+  sheetId: string;
+  start: { row: number; col: number };
+  end: { row: number; col: number };
+};
+
+export type InternalClipboardState = {
+  sourceSheetId: string;
+  sourceRange: CopySourceRange;
+  rows: CopiedCellEntry[][];
+  tsvText: string;
+} | null;
+
+export type PasteColumnMismatch = {
+  sourceColId: ColumnId;
+  sourceColName: string;
+  targetColId: ColumnId;
+  targetColName: string;
+};
+
+export type PendingPasteConfirmation = {
+  rowsData: CopiedCellEntry[][];
+  mismatches: PasteColumnMismatch[];
+  isCrossSheet: boolean;
+  sourceSheetName: string;
+  targetSheetName: string;
+} | null;
