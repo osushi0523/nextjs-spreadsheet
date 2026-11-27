@@ -1,0 +1,280 @@
+.cell {
+  width: 100%;
+  height: 100%;
+  border-width: 0 1px 1px 0;
+  border-style: solid;
+  border-color: var(--gray-a5);
+  background-color: var(--gray-1);
+  color: var(--gray-12);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.875rem;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: cell;
+}
+
+.cell:focus,
+.cell:focus-visible {
+  outline: none;
+}
+
+.cell__input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  background-color: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--gray-12);
+  box-sizing: border-box;
+  appearance: none;
+  text-align: left;
+}
+
+.cell__content {
+  user-select: none;
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell__content--center {
+  text-align: center;
+}
+
+.cell--readonly {
+  background-color: var(--gray-3);
+  color: var(--gray-11);
+  cursor: default;
+}
+
+.cell--subtotal {
+  background-color: var(--gray-3);
+  color: var(--gray-12);
+  font-weight: 600;
+  cursor: default;
+}
+
+.cell--lookup {
+  background-color: var(--gray-3);
+  color: var(--gray-11);
+  cursor: default;
+}
+
+.cell--edited {
+  background-color: var(--amber-3);
+}
+
+.cell--error {
+  background-color: var(--red-3);
+}
+
+.cell--validating {
+  background-color: var(--blue-2);
+}
+
+.cell--pulldown {
+  cursor: pointer;
+}
+
+.cell__errorIndicator {
+  margin-left: auto;
+  color: var(--red-9);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cell__validatingIndicator {
+  margin-left: auto;
+  color: var(--blue-9);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  animation: cellSpin 1s linear infinite;
+}
+
+@keyframes cellSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cell__pulldownIndicator {
+  margin-left: auto;
+  opacity: 0;
+  color: var(--gray-9);
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cell:hover .cell__pulldownIndicator {
+  opacity: 1;
+}
+
+.datePicker.datePicker {
+  --rdp-accent-color: var(--accent-9);
+  --rdp-accent-background-color: var(--accent-a3);
+  --rdp-day-height: var(--space-6);
+  --rdp-day-width: var(--space-6);
+  --rdp-day_button-height: var(--space-6);
+  --rdp-day_button-width: var(--space-6);
+  --rdp-day_button-border-radius: var(--radius-2);
+  --rdp-day_button-border: 1px solid transparent;
+  --rdp-selected-border: 1px solid var(--accent-9);
+  --rdp-today-color: var(--accent-a11);
+  --rdp-nav_button-height: calc(var(--space-5) + var(--space-1));
+  --rdp-nav_button-width: calc(var(--space-5) + var(--space-1));
+  --rdp-nav-height: var(--space-6);
+  --rdp-dropdown-gap: var(--space-2);
+  font-size: var(--font-size-1);
+  line-height: var(--line-height-1);
+  color: var(--gray-12);
+}
+
+.datePicker .datePicker__weekday {
+  color: var(--gray-11);
+  font-size: var(--font-size-1);
+  font-weight: var(--font-weight-medium);
+}
+
+.datePicker .datePicker__dayButton {
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-1);
+  color: var(--gray-12);
+  outline: none;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.datePicker .datePicker__dayButton:hover:not(:disabled) {
+  background-color: var(--accent-a3);
+  color: var(--accent-a11);
+}
+
+.datePicker .datePicker__dayButton:active:not(:disabled) {
+  background-color: var(--accent-a4);
+}
+
+.datePicker .datePicker__dayButton:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: -1px;
+}
+
+.datePicker .datePicker__outside .datePicker__dayButton {
+  color: var(--gray-8);
+}
+
+.datePicker .datePicker__today:not(.datePicker__selected) {
+  font-size: var(--font-size-1);
+}
+
+.datePicker
+  .datePicker__today:not(.datePicker__selected)
+  .datePicker__dayButton {
+  background-color: var(--accent-a3);
+  color: var(--accent-a11);
+  font-size: var(--font-size-1);
+  font-weight: var(--font-weight-medium);
+}
+
+.datePicker .datePicker__selected {
+  font-size: var(--font-size-1);
+  font-weight: var(--font-weight-medium);
+}
+
+.datePicker .datePicker__selected .datePicker__dayButton {
+  background-color: var(--accent-9);
+  color: var(--accent-contrast);
+  border-color: var(--accent-9);
+  font-size: var(--font-size-1);
+  font-weight: var(--font-weight-medium);
+}
+
+.datePicker .datePicker__selected .datePicker__dayButton:hover:not(:disabled) {
+  background-color: var(--accent-10);
+  color: var(--accent-contrast);
+}
+
+.datePicker .datePicker__selected .datePicker__dayButton:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: 1px;
+}
+
+.datePicker .datePicker__navButton {
+  border-radius: var(--radius-2);
+  color: var(--gray-11);
+  outline: none;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.datePicker
+  .datePicker__navButton:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--accent-a3);
+  color: var(--accent-a11);
+}
+
+.datePicker
+  .datePicker__navButton:active:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--accent-a4);
+}
+
+.datePicker .datePicker__navButton:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: -1px;
+}
+
+.datePicker .datePicker__monthCaption {
+  font-size: var(--font-size-2);
+  font-weight: var(--font-weight-medium);
+}
+
+.datePickerPopover.datePickerPopover {
+  width: auto;
+  padding: var(--space-3);
+  box-shadow: var(--shadow-5);
+}
+
+.datePickerPopover--compact.datePickerPopover--compact {
+  width: 200px;
+}
+
+.datePickerPopover--monthGrid.datePickerPopover--monthGrid {
+  width: 260px;
+}
+
+.datePicker__selectContent.datePicker__selectContent {
+  max-height: 240px;
+}
+
+.datePicker__timeSelectContent.datePicker__timeSelectContent {
+  max-height: 200px;
+}
+
+.datePicker__monthButtonsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.datePicker__timeFooter {
+  border-top: 1px solid var(--gray-a4);
+}

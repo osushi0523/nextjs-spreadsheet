@@ -1,0 +1,284 @@
+.sheet {
+  width: 100%;
+  height: 100%;
+  background-color: var(--gray-1);
+  color: var(--gray-12);
+  overflow: auto;
+  position: relative;
+  outline: none;
+}
+
+.sheet__inner {
+  position: relative;
+}
+
+.sheet__selection {
+  position: absolute;
+  border: 2px solid var(--accent-9);
+  background-color: var(--accent-a3);
+  pointer-events: none;
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+.sheet__copyRange {
+  position: absolute;
+  border: 2px dashed var(--accent-11);
+  pointer-events: none;
+  z-index: 6;
+  box-sizing: border-box;
+  animation: copyRangePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes copyRangePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sheet__cellsLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.sheet__cellWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.sheet__rowsContainer {
+  position: relative;
+}
+
+.sheet__statusColumn {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.sheet__statusColumnInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.sheet__statusColumnCell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--gray-2);
+  color: var(--gray-12);
+  border-right: 1px solid var(--gray-a5);
+  border-bottom: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+}
+
+.sheet__bodyContainer {
+  position: absolute;
+  z-index: 1;
+}
+
+.sheet__header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  background-color: var(--gray-2);
+}
+
+.sheet__headerStatusCorner {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background-color: inherit;
+  border-right: 1px solid var(--gray-a5);
+  border-bottom: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.sheet__headerColumns {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+}
+
+.sheet__headerCellWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+.sheet__headerCell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--gray-11);
+  border-right: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+
+  &.sheet__headerCell--dragging {
+    z-index: 10;
+    cursor: grabbing;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  &.sheet__headerCell--lookup {
+    cursor: default;
+    background-color: var(--gray-3);
+  }
+}
+
+.sheet__headerCellTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  padding: 0 4px;
+  max-width: calc(100% - 20px);
+}
+
+.sheet__headerCellMenuTrigger {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 2;
+
+  & button {
+    margin: 0;
+  }
+}
+
+.sheet__headerCell:hover .sheet__headerCellMenuTrigger,
+.sheet__headerCellMenuTrigger:focus-within,
+.sheet__headerCellMenuTrigger[data-state="open"] {
+  opacity: 1;
+}
+
+.sheet__headerResizer {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  border: none;
+  margin: 0;
+  background-color: transparent;
+
+  &.sheet__headerResizer--active {
+    background-color: var(--accent-9);
+  }
+}
+
+.sheet__resizerIndicator {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background-color: var(--accent-9);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.sheet__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  background-color: var(--gray-2);
+}
+
+.sheet__footerStatusCorner {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background-color: inherit;
+  border-right: 1px solid var(--gray-a5);
+  border-top: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet__footerCornerLabel {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--gray-11);
+}
+
+.sheet__footerColumns {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+}
+
+.sheet__footerCellWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+.sheet__footerCell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: normal;
+  color: var(--gray-12);
+  border-right: 1px solid var(--gray-a5);
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: var(--gray-2);
+}

@@ -1,6 +1,10 @@
 import { atom } from "jotai";
 import { atomFamily } from "jotai-family";
-import { validateCellRules } from "../utils/validation";
+import {
+  getParentColumnInfo,
+  validateCellRules,
+} from "../logics/business/validation";
+import { sheetRecordsQuery } from "../services/sheetRecords/sheetRecords.query";
 import {
   baseCellValuesAtom,
   baseColumnNamesAtom,
@@ -10,6 +14,7 @@ import {
 import {
   activeColumnConfigsAtom,
   getLookupValue,
+  isColumnReadOnly,
   referencedSheetsDataAtom,
 } from "./binding";
 import {
@@ -19,16 +24,42 @@ import {
   modifiedColumnOrdersAtom,
   modifiedRowOrdersAtom,
   rowStatusesAtom,
+  touchedCellsAtom,
 } from "./edit";
-import type { CellAddress, CellStatusInfo, ColumnId, RowId } from "./types";
+import { subtotalCellValueFamily } from "./inquiry";
+import {
+  type CellAddress,
+  type CellStatusInfo,
+  type ColumnId,
+  isSubtotalRowId,
+  parseRowIndex,
+  type RowId,
+} from "./types";
 import { activeCellAtom, activeSheetIdAtom } from "./ui";
-import { activeColumnValidationsAtom } from "./validation";
+import {
+  activeColumnValidationsAtom,
+  asyncValidationErrorsAtom,
+  customValidatorRegistryAtom,
+  validatingCellsAtom,
+} from "./validation";
 
 export const isCellEditingFamily = atomFamily(
   ({ row, col }: { row: number; col: number }) =>
     atom((get) => {
       const active = get(activeCellAtom);
       return active?.row === row && active?.col === col;
+    }),
+  (a, b) => a.row === b.row && a.col === b.col,
+);
+
+export const cellEditingInitialValueFamily = atomFamily(
+  ({ row, col }: { row: number; col: number }) =>
+    atom((get) => {
+      const active = get(activeCellAtom);
+      if (active?.row === row && active?.col === col) {
+        return active.initialValue;
+      }
+      return undefined;
     }),
   (a, b) => a.row === b.row && a.col === b.col,
 );
@@ -120,6 +151,11 @@ export const cellFamily = atomFamily(
 
     return atom(
       (get) => {
+        // 小計行セルの場合は subtotalCellValueFamily から値を取得
+        if (isSubtotalRowId(address.rowId)) {
+          return get(subtotalCellValueFamily(address));
+        }
+
         // If column is a lookup column, resolve dynamically from master sheet
         const configs = get(activeColumnConfigsAtom);
         const colConfig = configs[address.colId];
@@ -136,28 +172,77 @@ export const cellFamily = atomFamily(
         if (key in edits) {
           return edits[key];
         }
+
+        const activeSheetId = get(activeSheetIdAtom);
+        if (!activeSheetId) return "";
+
+        const rowIndex = parseRowIndex(address.rowId, activeSheetId);
+        if (rowIndex !== null) {
+          const records = get(sheetRecordsQuery.sync(activeSheetId));
+          return records[rowIndex]?.[address.colId] ?? "";
+        }
+
         return get(baseCellValuesAtom)[key] ?? ""; // 未編集なら初期データから取得
       },
       (get, set, newValue: string) => {
-        // Lookup or readOnly column is read-only
-        const configs = get(activeColumnConfigsAtom);
-        const colConfig = configs[address.colId];
-        if (colConfig && (colConfig.type === "lookup" || colConfig.readOnly)) {
+        // 小計行は編集不可
+        if (isSubtotalRowId(address.rowId)) {
           return;
         }
 
-        const baseValue = get(baseCellValuesAtom)[key] ?? "";
+        // Lookup or readOnly column is read-only
+        const configs = get(activeColumnConfigsAtom);
+        const colConfig = configs[address.colId];
+        if (isColumnReadOnly(colConfig)) {
+          return;
+        }
+
+        const activeSheetId = get(activeSheetIdAtom);
         const edits = get(cellEditsAtom);
+        const baseValue = (() => {
+          if (activeSheetId) {
+            const rowIndex = parseRowIndex(address.rowId, activeSheetId);
+            if (rowIndex !== null) {
+              const records = get(sheetRecordsQuery.sync(activeSheetId));
+              return records[rowIndex]?.[address.colId] ?? "";
+            }
+          }
+          return get(baseCellValuesAtom)[key] ?? "";
+        })();
+
         const currentValue = edits[key] ?? baseValue;
-
         if (currentValue === newValue) return;
-
-        set(cellEditsAtom, { ...edits, [key]: newValue }); // 編集時はDiffのみ更新
 
         const rowStatuses = get(rowStatusesAtom);
         const currentStatus = rowStatuses[address.rowId] ?? "none";
 
-        if (currentStatus === "none") {
+        // 元の値（baseValue）と同じ値に戻された場合は diff から除外
+        if (newValue === baseValue) {
+          const nextEdits = { ...edits };
+          delete nextEdits[key];
+          set(cellEditsAtom, nextEdits);
+
+          const hasOtherEditsInRow = Object.keys(nextEdits).some((k) =>
+            k.startsWith(`${address.rowId}-`),
+          );
+          if (!hasOtherEditsInRow) {
+            if (currentStatus === "edited" || currentStatus === "deleted") {
+              const nextStatuses = { ...rowStatuses };
+              delete nextStatuses[address.rowId];
+              set(rowStatusesAtom, nextStatuses);
+            }
+          } else if (currentStatus === "deleted") {
+            set(rowStatusesAtom, {
+              ...rowStatuses,
+              [address.rowId]: "edited",
+            });
+          }
+          return;
+        }
+
+        set(cellEditsAtom, { ...edits, [key]: newValue }); // 編集時はDiffのみ更新
+
+        if (currentStatus === "none" || currentStatus === "deleted") {
           set(rowStatusesAtom, {
             ...rowStatuses,
             [address.rowId]: "edited",
@@ -169,16 +254,85 @@ export const cellFamily = atomFamily(
   (a, b) => a.rowId === b.rowId && a.colId === b.colId,
 );
 
+const EMPTY_SET = new Set<string>();
+
+const areSetsEqual = (a: Set<string>, b: Set<string>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
+};
+
+const columnDuplicatesCache = new Map<ColumnId, Set<string>>();
+
+export const columnDuplicateValuesFamily = atomFamily(
+  (colId: ColumnId) =>
+    atom((get) => {
+      const validations = get(activeColumnValidationsAtom)[colId];
+      if (!validations?.some((r) => r.type === "unique")) {
+        return EMPTY_SET;
+      }
+
+      const rowOrder = get(rowOrderAtom);
+      const edits = get(cellEditsAtom);
+      const baseValues = get(baseCellValuesAtom);
+      const rowStatuses = get(rowStatusesAtom);
+
+      const seen = new Set<string>();
+      const duplicates = new Set<string>();
+
+      for (const rowId of rowOrder) {
+        if (isSubtotalRowId(rowId) || rowStatuses[rowId] === "deleted")
+          continue;
+        const key = `${rowId}-${colId}`;
+        const val = key in edits ? edits[key] : (baseValues[key] ?? "");
+        if (val.trim() === "") continue;
+
+        if (seen.has(val)) {
+          duplicates.add(val);
+        } else {
+          seen.add(val);
+        }
+      }
+
+      const prev = columnDuplicatesCache.get(colId);
+      if (prev && areSetsEqual(prev, duplicates)) {
+        return prev;
+      }
+      columnDuplicatesCache.set(colId, duplicates);
+      return duplicates;
+    }),
+  (a, b) => a === b,
+);
+
 export const cellStatusFamily = atomFamily(
   (address: CellAddress) => {
     const key = `${address.rowId}-${address.colId}` as const;
 
     return atom(
       (get): CellStatusInfo => {
+        // 小計行はバリデーション検証不要（ステータスなし）
+        if (isSubtotalRowId(address.rowId)) {
+          return { status: "none" };
+        }
+
+        // 0. 非同期検証通信中の場合は validating ステータスを最優先表示
+        const validatingCells = get(validatingCellsAtom);
+        if (validatingCells.has(key)) {
+          return { status: "validating", message: "検証中..." };
+        }
+
         // 1. バリデーションエラーや明示的なカスタムステータスを優先
         const customStatuses = get(cellCustomStatusesAtom);
         if (customStatuses[key] && customStatuses[key].status !== "none") {
           return customStatuses[key];
+        }
+
+        // 1.5 非同期バリデーションによって返されたエラーがあれば優先表示
+        const asyncErrors = get(asyncValidationErrorsAtom);
+        if (asyncErrors[key] && asyncErrors[key].status !== "none") {
+          return asyncErrors[key];
         }
 
         // 2. Lookup 列は読み取り専用のため変更なし扱い
@@ -193,23 +347,71 @@ export const cellStatusFamily = atomFamily(
         const baseValue = get(baseCellValuesAtom)[key] ?? "";
         const cellValue = key in edits ? edits[key] : baseValue;
 
+        // 新規追加行で、一度も blur（フォーカス離脱）または編集されておらず空のセルは初期バリデーションエラー表示を抑制
+        const rowStatuses = get(rowStatusesAtom);
+        const touchedCells = get(touchedCellsAtom);
+        if (
+          rowStatuses[address.rowId] === "added" &&
+          !touchedCells.has(key) &&
+          !(key in edits) &&
+          !cellValue
+        ) {
+          return { status: "none" };
+        }
+
         // 4. 列のバリデーションルールを順次検証
         const validations = get(activeColumnValidationsAtom)[address.colId];
         const pulldownConfig =
           colConfig?.type === "pulldown" ? colConfig.pulldown : undefined;
         const masterSheetData = pulldownConfig
-          ? get(referencedSheetsDataAtom)[pulldownConfig.sourceSheetId]
+          ? get(referencedSheetsDataAtom)[
+              pulldownConfig.relation?.targetSheetId ??
+                pulldownConfig.sourceSheetId
+            ]
           : undefined;
+
+        const colNames = get(columnNamesAtom);
+        const targetColName = colNames[address.colId];
+        const { parentColValue, parentColName } = getParentColumnInfo(
+          pulldownConfig?.relation,
+          address.rowId,
+          edits,
+          get(baseCellValuesAtom),
+          colNames,
+        );
+
+        const hasUniqueRule = validations?.some((r) => r.type === "unique");
+        const duplicateValues = hasUniqueRule
+          ? get(columnDuplicateValuesFamily(address.colId))
+          : undefined;
+
+        const getRowValue = (targetColId: ColumnId | string) => {
+          const k = `${address.rowId}-${targetColId}`;
+          return k in edits ? edits[k] : (get(baseCellValuesAtom)[k] ?? "");
+        };
+
+        const customValidators = get(customValidatorRegistryAtom);
+        const activeSheetId = get(activeSheetIdAtom) ?? undefined;
 
         const validationResult = validateCellRules(validations, cellValue, {
           pulldownConfig,
           masterSheetData,
           cellEdits: edits,
+          parentColValue,
+          parentColName,
+          targetColName,
+          duplicateValues,
+          sheetId: activeSheetId,
+          rowId: address.rowId,
+          colId: address.colId,
+          getRowValue,
+          customValidators,
         });
 
         if (!validationResult.valid) {
           return {
             status: "error",
+            message: validationResult.message,
             errorInfo: validationResult.errorInfo,
           };
         }

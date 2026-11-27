@@ -1,0 +1,28 @@
+export const localMessages = {
+  ja: {
+    statusAdded: "追加",
+    statusEdited: "変更",
+    statusDeleted: "削除",
+    statusNone: "",
+    menuAriaLabel: "行操作メニュー",
+    insertAbove: "上に行を挿入",
+    insertBelow: "下に行を挿入",
+    duplicateAbove: "上に行を複製",
+    duplicateBelow: "下に行を複製",
+    deleteRow: "行を削除",
+    revertRow: "変更を元に戻す",
+  },
+  en: {
+    statusAdded: "Added",
+    statusEdited: "Edited",
+    statusDeleted: "Deleted",
+    statusNone: "",
+    menuAriaLabel: "Row Actions Menu",
+    insertAbove: "Insert row above",
+    insertBelow: "Insert row below",
+    duplicateAbove: "Duplicate row above",
+    duplicateBelow: "Duplicate row below",
+    deleteRow: "Delete row",
+    revertRow: "Revert row",
+  },
+} as const;

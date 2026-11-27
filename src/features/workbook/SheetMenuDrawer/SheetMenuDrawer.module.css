@@ -1,0 +1,51 @@
+.drawerContent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 90vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background-color: var(--color-panel-solid, #ffffff);
+  border-right: 1px solid var(--gray-6);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-5);
+  animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  overflow: hidden;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.interactiveRow {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.interactiveRow:hover {
+  background-color: var(--gray-3);
+}
+
+.sheetItem {
+  transition: background-color 0.15s ease;
+}
+
+.sheetItem:hover {
+  background-color: var(--accent-2);
+}
+
+.sheetItemActive {
+  background-color: var(--accent-3);
+  box-shadow: inset 3px 0 0 var(--accent-9);
+}

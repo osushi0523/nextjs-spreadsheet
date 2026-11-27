@@ -1,0 +1,306 @@
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Dialog,
+  Flex,
+  RadioGroup,
+  ScrollArea,
+  Text,
+  TextField,
+} from "@radix-ui/themes";
+import type { FC } from "react";
+import { useMemo } from "react";
+import { useI18n } from "@/i18n/useI18n";
+import type { ColumnId } from "../stores/types";
+import { filterModalMessages } from "./i18n";
+
+export type FilterOption = {
+  value: string;
+  label: string;
+  detail?: string;
+};
+
+export type ColumnFilterModalPresenterProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  columnName: string;
+  options: FilterOption[];
+  selectedValues: string[];
+  searchQuery: string;
+  onChangeSearchQuery: (query: string) => void;
+  onToggleValue: (value: string) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onApply: () => void;
+  onClearFilter: () => void;
+  onCancel: () => void;
+  isFilterActive: boolean;
+  isSingleSelect?: boolean;
+  isRequired?: boolean;
+};
+
+export type ColumnFilterModalProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  targetColId: ColumnId;
+};
+
+export const ColumnFilterModalPresenter: FC<
+  ColumnFilterModalPresenterProps
+> = ({
+  open,
+  onOpenChange,
+  columnName,
+  options,
+  selectedValues,
+  searchQuery,
+  onChangeSearchQuery,
+  onToggleValue,
+  onSelectAll,
+  onDeselectAll,
+  onApply,
+  onClearFilter,
+  onCancel,
+  isFilterActive,
+  isSingleSelect = false,
+  isRequired = false,
+}) => {
+  const { t } = useI18n(filterModalMessages);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return options;
+    const q = searchQuery.toLowerCase();
+    return options.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [options, searchQuery]);
+
+  const allFilteredSelected = useMemo(() => {
+    if (filteredOptions.length === 0) return false;
+    return filteredOptions.every((opt) => selectedValues.includes(opt.value));
+  }, [filteredOptions, selectedValues]);
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Content style={{ maxWidth: 420, padding: 20 }}>
+        <Dialog.Title size="4" mb="1">
+          {t("title", { name: columnName || t("defaultColumnName") })}
+        </Dialog.Title>
+        <Dialog.Description size="2" mb="3" color="gray">
+          {t("description")}
+        </Dialog.Description>
+
+        <Flex direction="column" gap="3">
+          <TextField.Root
+            placeholder={t("searchPlaceholder")}
+            value={searchQuery}
+            onChange={(e) => onChangeSearchQuery(e.target.value)}
+            size="2"
+          >
+            <TextField.Slot>
+              <MagnifyingGlassIcon height="16" width="16" />
+            </TextField.Slot>
+          </TextField.Root>
+
+          <Flex justify="between" align="center">
+            <Text size="1" color="gray">
+              {isSingleSelect
+                ? selectedValues.length > 0
+                  ? t("selectedCount", { selected: 1, total: options.length })
+                  : t("deselectAll")
+                : t("selectedCount", {
+                    selected: selectedValues.length,
+                    total: options.length,
+                  })}
+            </Text>
+            <Flex gap="2">
+              {!isSingleSelect && (
+                <Button
+                  type="button"
+                  size="1"
+                  variant="ghost"
+                  onClick={onSelectAll}
+                  disabled={allFilteredSelected}
+                >
+                  {t("selectAll")}
+                </Button>
+              )}
+              {(!isSingleSelect || !isRequired) && (
+                <Button
+                  type="button"
+                  size="1"
+                  variant="ghost"
+                  onClick={onDeselectAll}
+                  disabled={selectedValues.length === 0}
+                >
+                  {t("deselectAll")}
+                </Button>
+              )}
+            </Flex>
+          </Flex>
+
+          <Box
+            style={{
+              border: "1px solid var(--gray-a6)",
+              borderRadius: "var(--radius-2)",
+              backgroundColor: "var(--color-background)",
+            }}
+          >
+            <ScrollArea
+              type="auto"
+              scrollbars="vertical"
+              style={{ maxHeight: 240, padding: "8px 12px" }}
+            >
+              {filteredOptions.length === 0 ? (
+                <Text
+                  size="2"
+                  color="gray"
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: "16px 0",
+                  }}
+                >
+                  {t("noMatchingValues")}
+                </Text>
+              ) : isSingleSelect ? (
+                <RadioGroup.Root
+                  value={selectedValues[0] ?? ""}
+                  onValueChange={(val) => onToggleValue(val)}
+                >
+                  <Flex direction="column" gap="2">
+                    {filteredOptions.map((opt) => {
+                      const isBlank = opt.value === "";
+                      return (
+                        <Text
+                          as="label"
+                          size="2"
+                          key={opt.value || "__blank__"}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          <RadioGroup.Item value={opt.value} />
+                          {isBlank ? (
+                            <Text color="gray" style={{ fontStyle: "italic" }}>
+                              {t("blankValue")}
+                            </Text>
+                          ) : (
+                            <Flex
+                              align="center"
+                              gap="1"
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <Text weight="medium">{opt.value}</Text>
+                              {opt.detail && (
+                                <Text size="1" color="gray">
+                                  ({opt.detail})
+                                </Text>
+                              )}
+                            </Flex>
+                          )}
+                        </Text>
+                      );
+                    })}
+                  </Flex>
+                </RadioGroup.Root>
+              ) : (
+                <Flex direction="column" gap="2">
+                  {filteredOptions.map((opt) => {
+                    const isChecked = selectedValues.includes(opt.value);
+                    const isBlank = opt.value === "";
+                    return (
+                      <Text
+                        as="label"
+                        size="2"
+                        key={opt.value || "__blank__"}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          cursor: "pointer",
+                          userSelect: "none",
+                        }}
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => onToggleValue(opt.value)}
+                        />
+                        {isBlank ? (
+                          <Text color="gray" style={{ fontStyle: "italic" }}>
+                            {t("blankValue")}
+                          </Text>
+                        ) : (
+                          <Flex
+                            align="center"
+                            gap="1"
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <Text weight="medium">{opt.value}</Text>
+                            {opt.detail && (
+                              <Text size="1" color="gray">
+                                ({opt.detail})
+                              </Text>
+                            )}
+                          </Flex>
+                        )}
+                      </Text>
+                    );
+                  })}
+                </Flex>
+              )}
+            </ScrollArea>
+          </Box>
+        </Flex>
+
+        <Flex justify="between" align="center" mt="4">
+          {isFilterActive ? (
+            <Button
+              type="button"
+              variant="soft"
+              color="red"
+              size="2"
+              onClick={onClearFilter}
+            >
+              {t("clearFilter")}
+            </Button>
+          ) : (
+            <Box />
+          )}
+          <Flex gap="2">
+            <Button
+              type="button"
+              variant="soft"
+              color="gray"
+              size="2"
+              onClick={onCancel}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="solid"
+              color="blue"
+              size="2"
+              onClick={onApply}
+            >
+              {t("apply")}
+            </Button>
+          </Flex>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+};

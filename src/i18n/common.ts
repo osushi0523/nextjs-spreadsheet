@@ -4,7 +4,7 @@ export const commonMessages = {
   ja: {
     ok: "OK",
     cancel: "キャンセル",
-    search: "検索する",
+    categoryOther: "その他",
 
     // バリデーション共通メッセージ
     validationRequired: "入力必須項目です",
@@ -16,12 +16,15 @@ export const commonMessages = {
     validationMaxLength: "{length}文字以内で入力してください",
     validationMinLength: "{length}文字以上で入力してください",
     validationReference: "マスタに存在しない値です",
+    validationReferenceRelation: "{parent}に{target}がありません",
+    validationDatetime: "{format}の形式で正しい日付を入力してください",
+    validationUnique: "値が重複しています",
     validationInvalid: "入力値が不正です",
   },
   en: {
     ok: "OK",
     cancel: "Cancel",
-    search: "Search",
+    categoryOther: "Other",
 
     // Validation common messages
     validationRequired: "This field is required",
@@ -33,6 +36,9 @@ export const commonMessages = {
     validationMaxLength: "Must be at most {length} characters",
     validationMinLength: "Must be at least {length} characters",
     validationReference: "Value does not exist in master data",
+    validationReferenceRelation: "{target} does not exist in {parent}",
+    validationDatetime: "Please enter a valid date in {format} format",
+    validationUnique: "Value must be unique",
     validationInvalid: "Invalid value",
   },
 } as const;

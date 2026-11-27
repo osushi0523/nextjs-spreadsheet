@@ -1,33 +1,129 @@
 import { atom, type Getter } from "jotai";
 import { atomFamily } from "jotai-family";
+import { localeAtom } from "@/i18n/context";
+import { getSheetDependencyIds } from "../logics/business/buildSheetData";
+import { sheetRecordsQuery } from "../services/sheetRecords/sheetRecords.query";
+import { buildSheetData } from "./base";
 import { cellEditsAtom } from "./edit";
+import { sheetTemplatesAtom } from "./templates";
 import type {
   CellAddress,
   ColumnConfig,
   ColumnId,
   LookupBinding,
   SheetData,
+  SheetTemplate,
 } from "./types";
-
 import { activeSheetIdAtom } from "./ui";
 
-// Record<sheetId, Record<ColumnId, ColumnConfig>>
+// ユーザーが動的に設定・カスタマイズした列設定（Record<sheetId, Record<ColumnId, ColumnConfig>>）
 export const columnConfigsAtom = atom<
   Record<string, Record<ColumnId, ColumnConfig>>
 >({});
 
-// Global store for sheets that are referenced as master data
-export const referencedSheetsDataAtom = atom<Record<string, SheetData>>({});
+// 参照先マスタシートのオンデマンド解決アトム（Jotai 非同期 Atom から導出・アクティブシートの依存先のみフェッチ）
+export const referencedSheetsDataAtom = atom<Record<string, SheetData>>(
+  (get) => {
+    const activeSheetId = get(activeSheetIdAtom);
+    const templates = get(sheetTemplatesAtom);
+    const result: Record<string, SheetData> = {};
+
+    if (!activeSheetId) return result;
+
+    const dependencyIds = getSheetDependencyIds(activeSheetId, templates);
+
+    const locale = get(localeAtom);
+    for (const sheetId of dependencyIds) {
+      const template = templates[sheetId];
+      if (!template) continue;
+      const records = get(sheetRecordsQuery.sync(sheetId));
+      result[sheetId] = buildSheetData(sheetId, template, records, locale);
+    }
+
+    return result;
+  },
+);
 
 const EMPTY_CONFIGS: Record<ColumnId, ColumnConfig> = {};
 
-// Column configs for the active sheet
+/**
+ * 列設定が読み取り専用（lookup 列またはサーバー指定の readOnly 列）かを判定する
+ */
+export const isColumnReadOnly = (config?: ColumnConfig): boolean =>
+  Boolean(config && (config.type === "lookup" || config.readOnly));
+
+/**
+ * テンプレート定義から静的な列設定マップを生成するヘルパー関数
+ */
+export const buildConfigsFromTemplate = (
+  template: SheetTemplate,
+): Record<ColumnId, ColumnConfig> => {
+  const configs: Record<ColumnId, ColumnConfig> = {};
+
+  for (const colDef of template.columns) {
+    const colId = colDef.field as ColumnId;
+    if (colDef.type.type === "datetime") {
+      configs[colId] = {
+        type: "datetime",
+        format: colDef.type.format,
+        readOnly: colDef.readOnly,
+      };
+    } else if (colDef.type.type === "pulldown") {
+      const { sourceTemplateId, sourceKeyField, lookupFields, mode, relation } =
+        colDef.type;
+      configs[colId] = {
+        type: "pulldown",
+        readOnly: colDef.readOnly,
+        pulldown: {
+          sourceSheetId: sourceTemplateId,
+          sourceKeyColId: sourceKeyField as ColumnId,
+          lookupColumns: lookupFields.map((lf) => ({
+            lookupColId: lf.field as ColumnId,
+            sourceColId: lf.sourceField as ColumnId,
+            sourceColName: lf.headerName,
+          })),
+          mode,
+          relation: relation
+            ? {
+                parentColId: relation.parentField as ColumnId,
+                targetSheetId: relation.targetSheetId ?? sourceTemplateId,
+                sourceFilterColId: relation.sourceFilterField as ColumnId,
+              }
+            : undefined,
+        },
+      };
+    } else if (colDef.type.type === "lookup") {
+      configs[colId] = {
+        type: "lookup",
+        readOnly: true,
+        lookup: {
+          parentColId: colDef.type.parentField as ColumnId,
+          sourceSheetId: colDef.type.sourceTemplateId,
+          sourceColId: colDef.type.sourceField as ColumnId,
+        },
+      };
+    } else if (colDef.readOnly) {
+      configs[colId] = { type: "default", readOnly: true };
+    }
+  }
+
+  return configs;
+};
+
+// Column configs for the active sheet（静的設定とユーザーオーバーライドの合成）
 export const activeColumnConfigsAtom = atom<Record<ColumnId, ColumnConfig>>(
   (get) => {
     const activeSheetId = get(activeSheetIdAtom);
     if (!activeSheetId) return EMPTY_CONFIGS;
-    const allConfigs = get(columnConfigsAtom);
-    return allConfigs[activeSheetId] ?? EMPTY_CONFIGS;
+
+    const templates = get(sheetTemplatesAtom);
+    const template = templates[activeSheetId];
+    const baseConfigs = template
+      ? buildConfigsFromTemplate(template)
+      : EMPTY_CONFIGS;
+    const userConfigs = get(columnConfigsAtom)[activeSheetId] ?? EMPTY_CONFIGS;
+
+    return { ...baseConfigs, ...userConfigs };
   },
 );
 
@@ -59,27 +155,44 @@ export const getLookupValue = (
   const masterSheet = get(referencedSheetsDataAtom)[sourceSheetId];
   if (!masterSheet) return "";
 
-  // Find parent pulldown binding to know the master's key column
-  const activeSheetId = get(activeSheetIdAtom);
-  const sheetConfigs = get(columnConfigsAtom)[activeSheetId ?? ""] ?? {};
-  const parentConfig = sheetConfigs[parentColId];
+  const configs = get(activeColumnConfigsAtom);
+  const parentConfig = configs[parentColId];
   if (!parentConfig || parentConfig.type !== "pulldown") return "";
 
   const sourceKeyColId = parentConfig.pulldown.sourceKeyColId;
 
-  // Find the row in masterSheet matching parentValue
+  const relation = parentConfig.pulldown.relation;
+  const grandParentValue = relation
+    ? (cellEdits[`${address.rowId}-${relation.parentColId}`] ??
+      baseCellValues[`${address.rowId}-${relation.parentColId}`] ??
+      "")
+    : undefined;
+
+  // 親キー（事業所等）が未入力・存在しない場合は参照しない
+  if (relation && !grandParentValue) return "";
+
+  // Find the row in masterSheet matching parentValue and relation
   for (const rowId of masterSheet.rows) {
     const key = `${rowId}-${sourceKeyColId}`;
     const rowKeyVal =
       key in cellEdits ? cellEdits[key] : masterSheet.values[key];
-    if (rowKeyVal === parentValue) {
-      const targetKey = `${rowId}-${sourceColId}`;
-      return (
-        (targetKey in cellEdits
-          ? cellEdits[targetKey]
-          : masterSheet.values[targetKey]) ?? ""
-      );
+    if (rowKeyVal !== parentValue) continue;
+
+    if (relation) {
+      const filterKey = `${rowId}-${relation.sourceFilterColId}`;
+      const filterVal =
+        filterKey in cellEdits
+          ? cellEdits[filterKey]
+          : masterSheet.values[filterKey];
+      if (filterVal !== grandParentValue) continue;
     }
+
+    const targetKey = `${rowId}-${sourceColId}`;
+    return (
+      (targetKey in cellEdits
+        ? cellEdits[targetKey]
+        : masterSheet.values[targetKey]) ?? ""
+    );
   }
 
   return "";
